@@ -8,6 +8,7 @@ target/
 *.class
 
 # Log files
+logs/
 *.log
 
 # Kotlin (if applicable)
