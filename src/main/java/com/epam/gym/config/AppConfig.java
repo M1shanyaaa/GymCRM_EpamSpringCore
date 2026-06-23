@@ -8,7 +8,6 @@ import org.springframework.context.annotation.*;
 @PropertySource("classpath:application.properties")
 public class AppConfig {
 
-    // Required to resolve ${...} placeholders from @Value
     @Bean
     public static org.springframework.context.support.PropertySourcesPlaceholderConfigurer
     propertySourcesPlaceholderConfigurer() {
