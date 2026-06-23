@@ -71,3 +71,7 @@ Run all unit tests:
 ```bash
 mvn test
 ```
+### Tests coverage
+
+<img width="546" height="247" alt="Знімок екрана 2026-06-23 154403" src="https://github.com/user-attachments/assets/5d332a8f-deff-4237-b106-bcdd993747ae" />
+
