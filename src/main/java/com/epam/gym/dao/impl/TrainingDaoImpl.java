@@ -2,6 +2,7 @@ package com.epam.gym.dao.impl;
 
 import com.epam.gym.dao.TrainingDao;
 import com.epam.gym.model.Training;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +23,11 @@ public class TrainingDaoImpl implements TrainingDao {
     @Autowired
     public TrainingDaoImpl(@Qualifier("trainingStorage") Map<Long, Training> storage) {
         this.storage = storage;
+    }
+
+    @PostConstruct
+    public void init() {
+        syncIdCounter();
     }
 
     @Override
@@ -49,4 +55,6 @@ public class TrainingDaoImpl implements TrainingDao {
         idCounter.set(max);
         log.debug("Synced training id counter to {}", max);
     }
+
+
 }
