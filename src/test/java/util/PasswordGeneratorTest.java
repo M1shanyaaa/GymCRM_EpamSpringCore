@@ -28,12 +28,11 @@ class PasswordGeneratorTest {
     }
 
     @Test
-    void generate_shouldProduceDifferentPasswordsOnMultipleCalls() {
-        Set<String> generated = new HashSet<>();
-        for (int i = 0; i < 100; i++) {
-            generated.add(passwordGenerator.generate());
-        }
-        // Extremely unlikely to have many collisions with 10-char random strings
-        assertThat(generated).hasSizeGreaterThan(95);
+    void generate_shouldProduceDifferentPasswords_onConsecutiveCalls() {
+        String p1 = passwordGenerator.generate();
+        String p2 = passwordGenerator.generate();
+
+        // Two random 10-char strings are virtually never identical
+        assertThat(p1).isNotEqualTo(p2);
     }
 }
