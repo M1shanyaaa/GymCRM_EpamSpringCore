@@ -2,6 +2,7 @@ package com.epam.gym.dao.impl;
 
 import com.epam.gym.dao.TraineeDao;
 import com.epam.gym.model.Trainee;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +23,11 @@ public class TraineeDaoImpl implements TraineeDao {
     @Autowired
     public TraineeDaoImpl(@Qualifier("traineeStorage") Map<Long, Trainee> storage) {
         this.storage = storage;
+    }
+
+    @PostConstruct
+    public void init() {
+        syncIdCounter();
     }
 
     @Override
@@ -65,5 +71,15 @@ public class TraineeDaoImpl implements TraineeDao {
         } else {
             log.warn("Cannot delete trainee: id={} not found", id);
         }
+    }
+
+    /**
+     * Used by storage initializer to sync the id counter
+     * with pre-loaded data (so generated ids don't clash).
+     */
+    public void syncIdCounter() {
+        long max = storage.keySet().stream().mapToLong(Long::longValue).max().orElse(0);
+        idCounter.set(max);
+        log.debug("Synced trainee id counter to {}", max);
     }
 }
