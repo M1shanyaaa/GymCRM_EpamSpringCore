@@ -8,6 +8,7 @@ import com.epam.gym.util.UsernameGenerator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -32,15 +33,8 @@ class TrainerServiceTest {
     @Mock
     private PasswordGenerator passwordGenerator;
 
+    @InjectMocks
     private TrainerService trainerService;
-
-    @BeforeEach
-    void setUp() {
-        trainerService = new TrainerService();
-        trainerService.setTrainerDao(trainerDao);
-        trainerService.setUsernameGenerator(usernameGenerator);
-        trainerService.setPasswordGenerator(passwordGenerator);
-    }
 
     @Test
     void create_shouldGenerateUsernameAndPassword_andSave() {

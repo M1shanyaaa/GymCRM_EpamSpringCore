@@ -6,8 +6,8 @@ import com.epam.gym.model.Training;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Defines in-memory storage beans.
@@ -19,16 +19,16 @@ public class StorageConfig {
 
     @Bean
     public Map<Long, Trainee> traineeStorage() {
-        return new HashMap<>();
+        return new ConcurrentHashMap<>();
     }
 
     @Bean
     public Map<Long, Trainer> trainerStorage() {
-        return new HashMap<>();
+        return new ConcurrentHashMap<>();
     }
 
     @Bean
     public Map<Long, Training> trainingStorage() {
-        return new HashMap<>();
+        return new ConcurrentHashMap<>();
     }
 }

@@ -26,18 +26,9 @@ public class TrainerService {
     private UsernameGenerator usernameGenerator;
     private PasswordGenerator passwordGenerator;
 
-    @Autowired
-    public void setTrainerDao(TrainerDao trainerDao) {
+    public TrainerService(TrainerDao trainerDao, UsernameGenerator usernameGenerator, PasswordGenerator passwordGenerator) {
         this.trainerDao = trainerDao;
-    }
-
-    @Autowired
-    public void setUsernameGenerator(UsernameGenerator usernameGenerator) {
         this.usernameGenerator = usernameGenerator;
-    }
-
-    @Autowired
-    public void setPasswordGenerator(PasswordGenerator passwordGenerator) {
         this.passwordGenerator = passwordGenerator;
     }
 

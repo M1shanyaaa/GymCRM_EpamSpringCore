@@ -10,5 +10,5 @@ public interface TraineeDao {
     Optional<Trainee> findById(Long id);
     List<Trainee> findAll();
     Trainee update(Trainee trainee);
-    void deleteById(Long id);
+    boolean deleteById(Long id);
 }

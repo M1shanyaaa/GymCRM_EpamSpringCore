@@ -31,12 +31,8 @@ public class UsernameGenerator {
     private TrainerDao trainerDao;
 
     @Autowired
-    public void setTraineeDao(TraineeDao traineeDao) {
+    public UsernameGenerator(TraineeDao traineeDao, TrainerDao trainerDao) {
         this.traineeDao = traineeDao;
-    }
-
-    @Autowired
-    public void setTrainerDao(TrainerDao trainerDao) {
         this.trainerDao = trainerDao;
     }
 

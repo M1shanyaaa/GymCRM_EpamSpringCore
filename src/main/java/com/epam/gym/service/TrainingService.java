@@ -1,5 +1,7 @@
 package com.epam.gym.service;
 
+import com.epam.gym.dao.TraineeDao;
+import com.epam.gym.dao.TrainerDao;
 import com.epam.gym.dao.TrainingDao;
 import com.epam.gym.model.Training;
 import org.slf4j.Logger;
@@ -20,11 +22,18 @@ public class TrainingService {
 
     private static final Logger log = LoggerFactory.getLogger(TrainingService.class);
 
-    private TrainingDao trainingDao;
+    private final TrainingDao trainingDao;
+    private final TraineeDao traineeDao;
+    private final TrainerDao trainerDao;
+
 
     @Autowired
-    public void setTrainingDao(TrainingDao trainingDao) {
+    public TrainingService(TrainingDao trainingDao,
+                           TraineeDao traineeDao,
+                           TrainerDao trainerDao) {
         this.trainingDao = trainingDao;
+        this.traineeDao = traineeDao;
+        this.trainerDao = trainerDao;
     }
 
     public Training create(Training training) {
@@ -57,6 +66,14 @@ public class TrainingService {
         }
         if (training.getTraineeId() == null || training.getTrainerId() == null) {
             throw new IllegalArgumentException("Training must reference both trainee and trainer");
+        }
+        if (traineeDao.findById(training.getTraineeId()).isEmpty()) {
+            throw new NoSuchElementException(
+                    "Cannot create training: trainee not found with id=" + training.getTraineeId());
+        }
+        if (trainerDao.findById(training.getTrainerId()).isEmpty()) {
+            throw new NoSuchElementException(
+                    "Cannot create training: trainer not found with id=" + training.getTrainerId());
         }
     }
 }

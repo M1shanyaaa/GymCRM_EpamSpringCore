@@ -30,13 +30,6 @@ class UsernameGeneratorTest {
     @InjectMocks
     private UsernameGenerator usernameGenerator;
 
-    @BeforeEach
-    void setUp() {
-        // @InjectMocks injects mocks; but UsernameGenerator uses setter injection,
-        // so we set them explicitly to be safe.
-        usernameGenerator.setTraineeDao(traineeDao);
-        usernameGenerator.setTrainerDao(trainerDao);
-    }
 
     @Test
     void generate_shouldReturnBaseUsername_whenNoCollision() {

@@ -8,8 +8,10 @@ import com.epam.gym.util.UsernameGenerator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -32,18 +34,15 @@ class TraineeServiceTest {
     @Mock
     private PasswordGenerator passwordGenerator;
 
+    @Mock
+    private PasswordEncoder passwordEncoder;
+
+    @InjectMocks
     private TraineeService traineeService;
 
-    @BeforeEach
-    void setUp() {
-        traineeService = new TraineeService();
-        traineeService.setTraineeDao(traineeDao);
-        traineeService.setUsernameGenerator(usernameGenerator);
-        traineeService.setPasswordGenerator(passwordGenerator);
-    }
 
     @Test
-    void create_shouldGenerateUsernameAndPassword_andSave() {
+    void create_shouldGenerateUsernameAndHashedPassword_andSave() {
         Trainee input = Trainee.builder()
                 .firstName("John")
                 .lastName("Smith")
@@ -51,15 +50,17 @@ class TraineeServiceTest {
 
         when(usernameGenerator.generate("John", "Smith")).thenReturn("John.Smith");
         when(passwordGenerator.generate()).thenReturn("Abc1234xyz");
+        when(passwordEncoder.encode("Abc1234xyz")).thenReturn("$2a$10$hashed");
         when(traineeDao.save(any(Trainee.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Trainee result = traineeService.create(input);
 
         assertThat(result.getUsername()).isEqualTo("John.Smith");
-        assertThat(result.getPassword()).isEqualTo("Abc1234xyz");
+        assertThat(result.getPassword()).isEqualTo("$2a$10$hashed");
 
         verify(usernameGenerator).generate("John", "Smith");
         verify(passwordGenerator).generate();
+        verify(passwordEncoder).encode("Abc1234xyz");
         verify(traineeDao).save(input);
     }
 

@@ -7,6 +7,7 @@ import com.epam.gym.util.UsernameGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -25,19 +26,12 @@ public class TraineeService {
     private TraineeDao traineeDao;
     private UsernameGenerator usernameGenerator;
     private PasswordGenerator passwordGenerator;
+    private final PasswordEncoder passwordEncoder;
 
-    @Autowired
-    public void setTraineeDao(TraineeDao traineeDao) {
+    public TraineeService(PasswordEncoder passwordEncoder, TraineeDao traineeDao, UsernameGenerator usernameGenerator, PasswordGenerator passwordGenerator) {
+        this.passwordEncoder = passwordEncoder;
         this.traineeDao = traineeDao;
-    }
-
-    @Autowired
-    public void setUsernameGenerator(UsernameGenerator usernameGenerator) {
         this.usernameGenerator = usernameGenerator;
-    }
-
-    @Autowired
-    public void setPasswordGenerator(PasswordGenerator passwordGenerator) {
         this.passwordGenerator = passwordGenerator;
     }
 
@@ -48,10 +42,11 @@ public class TraineeService {
         validateForCreate(trainee);
 
         String username = usernameGenerator.generate(trainee.getFirstName(), trainee.getLastName());
-        String password = passwordGenerator.generate();
+        String rawPassword = passwordGenerator.generate();
 
         trainee.setUsername(username);
-        trainee.setPassword(password);
+        trainee.setPassword(passwordEncoder.encode(rawPassword));
+        trainee.setActive(true);
 
         Trainee saved = traineeDao.save(trainee);
         log.info("Created trainee profile: username='{}', id={}", saved.getUsername(), saved.getUserId());
@@ -77,8 +72,12 @@ public class TraineeService {
         if (id == null) {
             throw new IllegalArgumentException("Trainee id must not be null for delete");
         }
-        traineeDao.deleteById(id);
-        log.info("Deleted trainee profile: id={}", id);
+        boolean deleted = traineeDao.deleteById(id);
+        if (deleted) {
+            log.info("Deleted trainee profile: id={}", id);
+        } else {
+            log.warn("Delete requested for non-existent trainee: id={}", id);
+        }
     }
 
     /**

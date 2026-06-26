@@ -1,5 +1,7 @@
 package service;
 
+import com.epam.gym.dao.TraineeDao;
+import com.epam.gym.dao.TrainerDao;
 import com.epam.gym.dao.TrainingDao;
 import com.epam.gym.model.Training;
 import com.epam.gym.model.TrainingType;
@@ -8,6 +10,7 @@ import com.epam.gym.service.TrainingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -28,13 +31,15 @@ class TrainingServiceTest {
     @Mock
     private TrainingDao trainingDao;
 
+    @Mock
+    private TraineeDao traineeDao;
+
+    @Mock
+    private TrainerDao trainerDao;
+
+    @InjectMocks
     private TrainingService trainingService;
 
-    @BeforeEach
-    void setUp() {
-        trainingService = new TrainingService();
-        trainingService.setTrainingDao(trainingDao);
-    }
 
     private Training validTraining() {
         return Training.builder()
@@ -50,6 +55,10 @@ class TrainingServiceTest {
     @Test
     void create_shouldSaveTraining() {
         Training input = validTraining();
+        when(traineeDao.findById(input.getTraineeId()))
+                .thenReturn(Optional.of(mock(com.epam.gym.model.Trainee.class)));
+        when(trainerDao.findById(input.getTrainerId()))
+                .thenReturn(Optional.of(mock(com.epam.gym.model.Trainer.class)));
         when(trainingDao.save(any(Training.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Training result = trainingService.create(input);

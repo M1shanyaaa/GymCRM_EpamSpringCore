@@ -64,12 +64,14 @@ public class TraineeDaoImpl implements TraineeDao {
     }
 
     @Override
-    public void deleteById(Long id) {
+    public boolean deleteById(Long id) {
         Trainee removed = storage.remove(id);
         if (removed != null) {
             log.debug("Deleted trainee with id={}", id);
+            return true;
         } else {
             log.warn("Cannot delete trainee: id={} not found", id);
+            return false;
         }
     }
 

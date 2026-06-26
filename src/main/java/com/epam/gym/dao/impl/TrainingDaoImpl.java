@@ -33,6 +33,7 @@ public class TrainingDaoImpl implements TrainingDao {
     @Override
     public Training save(Training training) {
         Long id = idCounter.incrementAndGet();
+        training.setId(id);
         storage.put(id, training);
         log.debug("Saved training with id={}", id);
         return training;
