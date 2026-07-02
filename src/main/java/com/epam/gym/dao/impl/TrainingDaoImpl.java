@@ -57,5 +57,4 @@ public class TrainingDaoImpl implements TrainingDao {
         log.debug("Synced training id counter to {}", max);
     }
 
-
 }
