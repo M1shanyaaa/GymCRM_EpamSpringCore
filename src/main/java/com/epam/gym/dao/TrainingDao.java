@@ -10,14 +10,12 @@ public interface TrainingDao {
 
     Training save(Training training);
 
-    // Function 14: trainee trainings with criteria
     List<Training> findTraineeTrainings(String traineeUsername,
                                         LocalDate fromDate,
                                         LocalDate toDate,
                                         String trainerName,
                                         TrainingTypeName trainingType);
 
-    // Function 15: trainer trainings with criteria
     List<Training> findTrainerTrainings(String trainerUsername,
                                         LocalDate fromDate,
                                         LocalDate toDate,
