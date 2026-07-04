@@ -1,4 +1,4 @@
-package com.epam.gym.castomExeptions;
+package com.epam.gym.exception;
 
 /**
  * Thrown when username/password authentication fails.

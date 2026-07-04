@@ -1,6 +1,6 @@
 package com.epam.gym.service;
 
-import com.epam.gym.castomExeptions.AuthenticationException;
+import com.epam.gym.exception.AuthenticationException;
 import com.epam.gym.dao.UserDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
