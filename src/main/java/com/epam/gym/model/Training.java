@@ -21,13 +21,11 @@ public class Training {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "trainee_id", nullable = false)
     @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     private Trainee trainee;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "trainer_id", nullable = false)
     @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     private Trainer trainer;
 
     @Column(name = "training_name", nullable = false)
@@ -40,7 +38,6 @@ public class Training {
     @Column(name = "training_date", nullable = false)
     private LocalDate trainingDate;
 
-    // Note 8: duration is a number (minutes)
     @Column(name = "training_duration", nullable = false)
     private Integer trainingDuration;
 }

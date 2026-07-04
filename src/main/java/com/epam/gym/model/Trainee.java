@@ -29,7 +29,6 @@ public class Trainee {
     @OneToOne(cascade = CascadeType.ALL, fetch = FetchType.EAGER, orphanRemoval = true)
     @JoinColumn(name = "user_id", nullable = false)
     @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     private User user;
 
     @ManyToMany(fetch = FetchType.LAZY)
@@ -39,13 +38,11 @@ public class Trainee {
             inverseJoinColumns = @JoinColumn(name = "trainer_id")
     )
     @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     @Builder.Default
     private Set<Trainer> trainers = new HashSet<>();
 
     @OneToMany(mappedBy = "trainee", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     @Builder.Default
     private Set<Training> trainings = new HashSet<>();
 }

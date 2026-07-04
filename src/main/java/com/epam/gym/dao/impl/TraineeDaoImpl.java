@@ -59,4 +59,6 @@ public class TraineeDaoImpl implements TraineeDao {
         sessionFactory.getCurrentSession().remove(trainee);
         log.debug("Removed trainee with id={}", trainee.getId());
     }
+
+
 }
