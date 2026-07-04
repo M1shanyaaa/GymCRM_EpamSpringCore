@@ -17,4 +17,6 @@ public interface TrainerDao {
 
     // trainers NOT assigned to given trainee
     List<Trainer> findUnassignedTrainers(String traineeUsername);
+
+    List<Trainer> findByUsernames(List<String> usernames);
 }

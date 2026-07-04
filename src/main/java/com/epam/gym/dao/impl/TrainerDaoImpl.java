@@ -56,6 +56,21 @@ public class TrainerDaoImpl implements TrainerDao {
     }
 
     @Override
+    public List<Trainer> findByUsernames(List<String> usernames) {
+        if (usernames == null || usernames.isEmpty()) {
+            return List.of();
+        }
+        List<Trainer> result = sessionFactory.getCurrentSession()
+                .createQuery(
+                        "SELECT t FROM Trainer t WHERE t.user.username IN (:usernames)",
+                        Trainer.class)
+                .setParameter("usernames", usernames)
+                .list();
+        log.debug("findByUsernames({}) -> count={}", usernames, result.size());
+        return result;
+    }
+
+    @Override
     public List<Trainer> findUnassignedTrainers(String traineeUsername) {
         // Trainers that are NOT in the trainee's trainers set
         List<Trainer> result = sessionFactory.getCurrentSession()
