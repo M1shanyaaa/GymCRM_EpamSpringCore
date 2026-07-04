@@ -6,8 +6,15 @@ import java.util.List;
 import java.util.Optional;
 
 public interface TrainerDao {
+
     Trainer save(Trainer trainer);
-    Optional<Trainer> findById(Long id);
-    List<Trainer> findAll();
+
     Trainer update(Trainer trainer);
+
+    Optional<Trainer> findById(Long id);
+
+    Optional<Trainer> findByUsername(String username);
+
+    // trainers NOT assigned to given trainee
+    List<Trainer> findUnassignedTrainers(String traineeUsername);
 }

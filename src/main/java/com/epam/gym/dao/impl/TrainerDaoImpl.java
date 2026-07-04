@@ -2,74 +2,70 @@ package com.epam.gym.dao.impl;
 
 import com.epam.gym.dao.TrainerDao;
 import com.epam.gym.model.Trainer;
-import jakarta.annotation.PostConstruct;
+import org.hibernate.SessionFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Repository;
 
-import java.util.*;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.List;
+import java.util.Optional;
 
 @Repository
 public class TrainerDaoImpl implements TrainerDao {
 
     private static final Logger log = LoggerFactory.getLogger(TrainerDaoImpl.class);
 
-    private final Map<Long, Trainer> storage;
-    private final AtomicLong idCounter = new AtomicLong(0);
+    private final SessionFactory sessionFactory;
 
     @Autowired
-    public TrainerDaoImpl(@Qualifier("trainerStorage") Map<Long, Trainer> storage) {
-        this.storage = storage;
-    }
-
-    @PostConstruct
-    public void init() {
-        syncIdCounter();
+    public TrainerDaoImpl(SessionFactory sessionFactory) {
+        this.sessionFactory = sessionFactory;
     }
 
     @Override
     public Trainer save(Trainer trainer) {
-        Long id = idCounter.incrementAndGet();
-        trainer.setUserId(id);
-        storage.put(id, trainer);
-        log.debug("Saved trainer with id={}", id);
+        sessionFactory.getCurrentSession().persist(trainer);
+        log.debug("Persisted trainer with id={}", trainer.getId());
         return trainer;
-    }
-
-    @Override
-    public Optional<Trainer> findById(Long id) {
-        log.debug("Finding trainer by id={}", id);
-        return Optional.ofNullable(storage.get(id));
-    }
-
-    @Override
-    public List<Trainer> findAll() {
-        log.debug("Finding all trainers, count={}", storage.size());
-        return new ArrayList<>(storage.values());
     }
 
     @Override
     public Trainer update(Trainer trainer) {
-        Long id = trainer.getUserId();
-        if (id == null || !storage.containsKey(id)) {
-            log.warn("Cannot update trainer: id={} not found", id);
-            throw new NoSuchElementException("Trainer not found with id=" + id);
-        }
-        storage.put(id, trainer);
-        log.debug("Updated trainer with id={}", id);
-        return trainer;
+        Trainer merged = sessionFactory.getCurrentSession().merge(trainer);
+        log.debug("Merged trainer with id={}", merged.getId());
+        return merged;
     }
 
-    /**
-     * Used by storage initializer to sync the id counter
-     * with pre-loaded data (so generated ids don't clash).
-     */
-    public void syncIdCounter() {
-        long max = storage.keySet().stream().mapToLong(Long::longValue).max().orElse(0);
-        idCounter.set(max);
-        log.debug("Synced trainer id counter to {}", max);
+    @Override
+    public Optional<Trainer> findById(Long id) {
+        Trainer trainer = sessionFactory.getCurrentSession().get(Trainer.class, id);
+        log.debug("findById({}) -> found={}", id, trainer != null);
+        return Optional.ofNullable(trainer);
+    }
+
+    @Override
+    public Optional<Trainer> findByUsername(String username) {
+        Trainer trainer = sessionFactory.getCurrentSession()
+                .createQuery(
+                        "FROM Trainer t WHERE t.user.username = :username", Trainer.class)
+                .setParameter("username", username)
+                .uniqueResult();
+        log.debug("findByUsername({}) -> found={}", username, trainer != null);
+        return Optional.ofNullable(trainer);
+    }
+
+    @Override
+    public List<Trainer> findUnassignedTrainers(String traineeUsername) {
+        // Trainers that are NOT in the trainee's trainers set
+        List<Trainer> result = sessionFactory.getCurrentSession()
+                .createQuery(
+                        "SELECT t FROM Trainer t WHERE t.id NOT IN " +
+                                "(SELECT tr.id FROM Trainee te JOIN te.trainers tr " +
+                                " WHERE te.user.username = :username)", Trainer.class)
+                .setParameter("username", traineeUsername)
+                .list();
+        log.debug("findUnassignedTrainers({}) -> count={}", traineeUsername, result.size());
+        return result;
     }
 }
