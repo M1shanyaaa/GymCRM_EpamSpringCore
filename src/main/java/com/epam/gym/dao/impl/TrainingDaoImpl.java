@@ -33,19 +33,9 @@ public class TrainingDaoImpl implements TrainingDao {
     // This is a deliberate example of low-level Hibernate usage.
     @Override
     public Training save(Training training) {
-        try (Session session = sessionFactory.openSession()) {
-            Transaction tx = session.beginTransaction();
-            try {
-                session.persist(training);
-                tx.commit();
-                log.debug("Persisted training id={} (manual tx)", training.getId());
-                return training;
-            } catch (RuntimeException ex) {
-                tx.rollback();
-                log.error("Failed to persist training, transaction rolled back", ex);
-                throw ex;
-            }
-        }
+        sessionFactory.getCurrentSession().persist(training);
+        log.debug("Persisted training with id={}", training.getId());
+        return training;
     }
 
     // ---------- Trainee trainings by criteria (Function 14) ----------
