@@ -28,9 +28,6 @@ public class TrainingDaoImpl implements TrainingDao {
     }
 
     // ---------- Add training (Function 16) ----------
-    // Demonstrates manual session/transaction handling via openSession()
-    // NOTE: normally we rely on getCurrentSession() + @Transactional (see other DAOs).
-    // This is a deliberate example of low-level Hibernate usage.
     @Override
     public Training save(Training training) {
         sessionFactory.getCurrentSession().persist(training);
