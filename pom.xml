@@ -210,13 +210,6 @@
             <version>2.6.0</version>
         </dependency>
 
-        <!-- Spring Web test (MockMvc) -->
-        <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-webmvc</artifactId>
-            <version>6.1.13</version>
-            <scope>test</scope>
-        </dependency>
 
     </dependencies>
 

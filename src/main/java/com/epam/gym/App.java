@@ -1,47 +1,55 @@
 package com.epam.gym;
 
 import com.epam.gym.config.AppConfig;
-import com.epam.gym.facade.GymFacade;
-import com.epam.gym.model.Trainee;
-import com.epam.gym.model.Trainer;
-import com.epam.gym.model.TrainingTypeName;
+import jakarta.servlet.ServletException;
+import org.apache.catalina.Context;
+import org.apache.catalina.LifecycleException;
+import org.apache.catalina.startup.Tomcat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
+import org.springframework.web.servlet.DispatcherServlet;
 
-import java.time.LocalDate;
+import java.io.File;
 import java.util.TimeZone;
 
+/**
+ * Application entry point.
+ * Bootstraps an embedded Tomcat server hosting the Spring MVC DispatcherServlet.
+ */
 public class App {
 
     private static final Logger log = LoggerFactory.getLogger(App.class);
 
-    public static void main(String[] args) {
+    private static final int PORT = 8080;
+    private static final String CONTEXT_PATH = "";
+    private static final String SERVLET_NAME = "dispatcher";
+    private static final String MAPPING = "/";
+
+    public static void main(String[] args) throws LifecycleException, ServletException {
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
-        var context = new AnnotationConfigApplicationContext(AppConfig.class);
-        GymFacade facade = context.getBean(GymFacade.class);
 
-        log.info("===== DEMO: working through GymFacade =====");
+        // 1. Root Spring context (services, DAO, Hibernate, etc.)
+        AnnotationConfigWebApplicationContext rootContext =
+                new AnnotationConfigWebApplicationContext();
+        rootContext.register(AppConfig.class);
 
-        // --- Create a trainee (username/password auto-generated) ---
-        Trainee trainee = facade.createTrainee(
-                "Peter", "Parker", LocalDate.of(2000, 3, 10), "New York");
-        log.info("Created trainee: username='{}', id={}",
-                trainee.getUser().getUsername(), trainee.getId());
+        // 2. Configure embedded Tomcat
+        Tomcat tomcat = new Tomcat();
+        tomcat.setPort(PORT);
+        tomcat.getConnector(); // triggers default connector creation
 
-        // --- Create a trainee with the SAME name (serial suffix demo) ---
-        Trainee duplicate = facade.createTrainee(
-                "Peter", "Parker", LocalDate.of(1998, 1, 1), "Queens");
-        log.info("Created duplicate trainee: username='{}' (serial suffix)",
-                duplicate.getUser().getUsername());
+        String docBase = new File(".").getAbsolutePath();
+        Context tomcatContext = tomcat.addContext(CONTEXT_PATH, docBase);
 
-        // --- Create a trainer ---
-        Trainer trainer = facade.createTrainer(
-                "Bruce", "Wayne", TrainingTypeName.STRENGTH);
-        log.info("Created trainer: username='{}', id={}",
-                trainer.getUser().getUsername(), trainer.getId());
+        // 3. Register Spring DispatcherServlet
+        DispatcherServlet dispatcher = new DispatcherServlet(rootContext);
+        Tomcat.addServlet(tomcatContext, SERVLET_NAME, dispatcher).setLoadOnStartup(1);
+        tomcatContext.addServletMappingDecoded(MAPPING, SERVLET_NAME);
 
-        log.info("===== DEMO finished — check the database =====");
-        context.close();
+        // 4. Start
+        tomcat.start();
+        log.info("===== Gym CRM REST API started on http://localhost:{} =====", PORT);
+        tomcat.getServer().await();
     }
 }
