@@ -1,7 +1,10 @@
 package com.epam.gym.service;
 
 import com.epam.gym.dao.TraineeDao;
+import com.epam.gym.dto.response.CredentialsResponse;
+import com.epam.gym.dto.response.TraineeProfileResponse;
 import com.epam.gym.exception.EntityNotFoundException;
+import com.epam.gym.mapper.TraineeMapper;
 import com.epam.gym.model.Trainee;
 import com.epam.gym.model.User;
 import com.epam.gym.util.PasswordGenerator;
@@ -26,24 +29,27 @@ public class TraineeService {
     private final PasswordGenerator passwordGenerator;
     private final PasswordEncoder passwordEncoder;
     private final AuthService authService;
+    private final TraineeMapper traineeMapper;
 
     @Autowired
     public TraineeService(TraineeDao traineeDao,
                           UsernameGenerator usernameGenerator,
                           PasswordGenerator passwordGenerator,
                           PasswordEncoder passwordEncoder,
-                          AuthService authService) {
+                          AuthService authService,
+                          TraineeMapper traineeMapper) {
         this.traineeDao = traineeDao;
         this.usernameGenerator = usernameGenerator;
         this.passwordGenerator = passwordGenerator;
         this.passwordEncoder = passwordEncoder;
         this.authService = authService;
+        this.traineeMapper = traineeMapper;
     }
 
-    // ---------- Function 2: Create Trainee profile ----------
+    // ---------- Endpoint 1: Trainee registration ----------
     @Transactional
-    public Trainee create(String firstName, String lastName,
-                          LocalDate dateOfBirth, String address) {
+    public CredentialsResponse create(String firstName, String lastName,
+                                      LocalDate dateOfBirth, String address) {
         validateRequired(firstName, lastName);
 
         String rawPassword = passwordGenerator.generate();
@@ -65,17 +71,20 @@ public class TraineeService {
         Trainee saved = traineeDao.save(trainee);
         log.info("Created trainee profile: username='{}', id={}",
                 saved.getUser().getUsername(), saved.getId());
-        return saved;
+
+        // raw password is returned only here, never stored/logged
+        return new CredentialsResponse(saved.getUser().getUsername(), rawPassword);
     }
 
-    // ---------- Function 6: Select Trainee profile by username ----------
+    // ---------- Endpoint 5: Get Trainee profile ----------
     @Transactional(readOnly = true)
-    public Trainee findByUsername(String username, String password) {
+    public TraineeProfileResponse getProfile(String username, String password) {
         authService.authenticate(username, password);
-        return getTraineeOrThrow(username);
+        Trainee trainee = getTraineeOrThrow(username);
+        return traineeMapper.toProfile(trainee);
     }
 
-    // ---------- Function 7: Trainee password change ----------
+    // ---------- Endpoint 4: Change password ----------
     @Transactional
     public void changePassword(String username, String oldPassword, String newPassword) {
         authService.authenticate(username, oldPassword);
@@ -90,38 +99,39 @@ public class TraineeService {
         log.info("Password changed for trainee '{}'", username);
     }
 
-    // ---------- Function 10: Update Trainee profile ----------
+    // ---------- Endpoint 6: Update Trainee profile ----------
     @Transactional
-    public Trainee update(String username, String password,
-                          String firstName, String lastName,
-                          LocalDate dateOfBirth, String address) {
+    public TraineeProfileResponse update(String username, String password,
+                                         String firstName, String lastName,
+                                         LocalDate dateOfBirth, String address,
+                                         boolean isActive) {
         authService.authenticate(username, password);
         validateRequired(firstName, lastName);
 
         Trainee trainee = getTraineeOrThrow(username);
         trainee.getUser().setFirstName(firstName);
         trainee.getUser().setLastName(lastName);
+        trainee.getUser().setActive(isActive);
         trainee.setDateOfBirth(dateOfBirth);
         trainee.setAddress(address);
 
         Trainee updated = traineeDao.update(trainee);
         log.info("Updated trainee profile '{}'", username);
-        return updated;
+        return traineeMapper.toProfile(updated);
     }
 
-    // ---------- Function 11: Activate/De-activate trainee (NOT idempotent) ----------
+    // ---------- Endpoint 15: Activate/De-activate (NOT idempotent per spec) ----------
     @Transactional
-    public void toggleActive(String username, String password) {
+    public void setActive(String username, String password, boolean isActive) {
         authService.authenticate(username, password);
 
         Trainee trainee = getTraineeOrThrow(username);
-        boolean newStatus = !trainee.getUser().isActive();
-        trainee.getUser().setActive(newStatus);
+        trainee.getUser().setActive(isActive);
         traineeDao.update(trainee);
-        log.info("Trainee '{}' active status changed to {}", username, newStatus);
+        log.info("Trainee '{}' active status set to {}", username, isActive);
     }
 
-    // ---------- Function 13: Delete Trainee profile by username (hard delete + cascade) ----------
+    // ---------- Endpoint 7: Delete Trainee profile (hard delete + cascade) ----------
     @Transactional
     public void delete(String username, String password) {
         authService.authenticate(username, password);

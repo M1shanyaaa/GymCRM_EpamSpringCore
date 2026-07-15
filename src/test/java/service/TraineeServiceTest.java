@@ -1,8 +1,11 @@
 package service;
 
 import com.epam.gym.dao.TraineeDao;
+import com.epam.gym.dto.response.CredentialsResponse;
+import com.epam.gym.dto.response.TraineeProfileResponse;
 import com.epam.gym.exception.AuthenticationException;
 import com.epam.gym.exception.EntityNotFoundException;
+import com.epam.gym.mapper.TraineeMapper;
 import com.epam.gym.model.Trainee;
 import com.epam.gym.model.User;
 import com.epam.gym.service.AuthService;
@@ -19,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -35,6 +39,7 @@ class TraineeServiceTest {
     @Mock private PasswordGenerator passwordGenerator;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private AuthService authService;
+    @Mock private TraineeMapper traineeMapper;
 
     @InjectMocks
     private TraineeService traineeService;
@@ -58,16 +63,21 @@ class TraineeServiceTest {
                 .build();
     }
 
+    private TraineeProfileResponse sampleProfile() {
+        return new TraineeProfileResponse(
+                "John", "Smith", LocalDate.of(1990, 1, 1), "Kyiv", true, List.of());
+    }
+
     // ---------- create ----------
 
     @Test
-    void create_shouldGenerateUsernameHashPasswordAndSave() {
+    void create_shouldGenerateUsernameHashPasswordAndReturnCredentials() {
         when(usernameGenerator.generate("John", "Smith")).thenReturn("John.Smith");
         when(passwordGenerator.generate()).thenReturn("rawPass");
         when(passwordEncoder.encode("rawPass")).thenReturn("hashed");
         when(traineeDao.save(any(Trainee.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        Trainee result = traineeService.create("John", "Smith",
+        CredentialsResponse result = traineeService.create("John", "Smith",
                 LocalDate.of(1990, 1, 1), "Kyiv");
 
         ArgumentCaptor<Trainee> captor = ArgumentCaptor.forClass(Trainee.class);
@@ -78,7 +88,10 @@ class TraineeServiceTest {
         assertThat(saved.getUser().getPassword()).isEqualTo("hashed");
         assertThat(saved.getUser().isActive()).isTrue();
         assertThat(saved.getAddress()).isEqualTo("Kyiv");
-        assertThat(result).isNotNull();
+
+        // credentials response returns raw password (not the hash)
+        assertThat(result.username()).isEqualTo("John.Smith");
+        assertThat(result.password()).isEqualTo("rawPass");
     }
 
     @Test
@@ -95,32 +108,35 @@ class TraineeServiceTest {
         verifyNoInteractions(traineeDao);
     }
 
-    // ---------- findByUsername ----------
+    // ---------- getProfile ----------
 
     @Test
-    void findByUsername_shouldReturnTrainee_whenAuthenticated() {
+    void getProfile_shouldReturnProfile_whenAuthenticated() {
         when(traineeDao.findByUsername("John.Smith")).thenReturn(Optional.of(trainee));
+        when(traineeMapper.toProfile(trainee)).thenReturn(sampleProfile());
 
-        Trainee result = traineeService.findByUsername("John.Smith", "raw");
+        TraineeProfileResponse result = traineeService.getProfile("John.Smith", "raw");
 
-        assertThat(result).isSameAs(trainee);
+        assertThat(result.firstName()).isEqualTo("John");
+        assertThat(result.lastName()).isEqualTo("Smith");
+        assertThat(result.isActive()).isTrue();
         verify(authService).authenticate("John.Smith", "raw");
     }
 
     @Test
-    void findByUsername_shouldThrow_whenNotFound() {
+    void getProfile_shouldThrow_whenNotFound() {
         when(traineeDao.findByUsername("Ghost")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> traineeService.findByUsername("Ghost", "raw"))
+        assertThatThrownBy(() -> traineeService.getProfile("Ghost", "raw"))
                 .isInstanceOf(EntityNotFoundException.class);
     }
 
     @Test
-    void findByUsername_shouldThrow_whenAuthFails() {
+    void getProfile_shouldThrow_whenAuthFails() {
         doThrow(new AuthenticationException("bad"))
                 .when(authService).authenticate("John.Smith", "wrong");
 
-        assertThatThrownBy(() -> traineeService.findByUsername("John.Smith", "wrong"))
+        assertThatThrownBy(() -> traineeService.getProfile("John.Smith", "wrong"))
                 .isInstanceOf(AuthenticationException.class);
         verify(traineeDao, never()).findByUsername(anyString());
     }
@@ -150,47 +166,55 @@ class TraineeServiceTest {
     // ---------- update ----------
 
     @Test
-    void update_shouldModifyFieldsAndSave() {
+    void update_shouldModifyFieldsAndReturnProfile() {
         when(traineeDao.findByUsername("John.Smith")).thenReturn(Optional.of(trainee));
         when(traineeDao.update(any(Trainee.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(traineeMapper.toProfile(any(Trainee.class))).thenReturn(sampleProfile());
 
-        Trainee result = traineeService.update("John.Smith", "raw",
-                "Johnny", "Smithson", LocalDate.of(1985, 5, 5), "Lviv");
+        TraineeProfileResponse result = traineeService.update("John.Smith", "raw",
+                "Johnny", "Smithson", LocalDate.of(1985, 5, 5), "Lviv", false);
 
-        assertThat(result.getUser().getFirstName()).isEqualTo("Johnny");
-        assertThat(result.getUser().getLastName()).isEqualTo("Smithson");
-        assertThat(result.getAddress()).isEqualTo("Lviv");
+        // entity was mutated correctly
+        assertThat(trainee.getUser().getFirstName()).isEqualTo("Johnny");
+        assertThat(trainee.getUser().getLastName()).isEqualTo("Smithson");
+        assertThat(trainee.getUser().isActive()).isFalse();
+        assertThat(trainee.getAddress()).isEqualTo("Lviv");
+        assertThat(trainee.getDateOfBirth()).isEqualTo(LocalDate.of(1985, 5, 5));
+
+        assertThat(result).isNotNull();
         verify(authService).authenticate("John.Smith", "raw");
     }
 
     @Test
     void update_shouldThrow_whenNamesBlank() {
         assertThatThrownBy(() ->
-                traineeService.update("John.Smith", "raw", "", "", null, null))
+                traineeService.update("John.Smith", "raw", "", "", null, null, true))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
-    // ---------- toggleActive ----------
+    // ---------- setActive ----------
 
     @Test
-    void toggleActive_shouldFlipStatus_fromActiveToInactive() {
+    void setActive_shouldDeactivate() {
         trainee.getUser().setActive(true);
         when(traineeDao.findByUsername("John.Smith")).thenReturn(Optional.of(trainee));
 
-        traineeService.toggleActive("John.Smith", "raw");
+        traineeService.setActive("John.Smith", "raw", false);
 
         assertThat(trainee.getUser().isActive()).isFalse();
+        verify(authService).authenticate("John.Smith", "raw");
         verify(traineeDao).update(trainee);
     }
 
     @Test
-    void toggleActive_shouldFlipStatus_fromInactiveToActive() {
+    void setActive_shouldActivate() {
         trainee.getUser().setActive(false);
         when(traineeDao.findByUsername("John.Smith")).thenReturn(Optional.of(trainee));
 
-        traineeService.toggleActive("John.Smith", "raw");
+        traineeService.setActive("John.Smith", "raw", true);
 
         assertThat(trainee.getUser().isActive()).isTrue();
+        verify(traineeDao).update(trainee);
     }
 
     // ---------- delete ----------
