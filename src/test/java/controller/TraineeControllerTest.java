@@ -54,7 +54,7 @@ class TraineeControllerTest {
     }
 
     @Test
-    void register_shouldReturn201() throws Exception {
+    void register_shouldReturn200() throws Exception {
         when(traineeService.create(eq("John"), eq("Smith"), any(), any()))
                 .thenReturn(new CredentialsResponse("John.Smith", "genPass"));
 
@@ -67,7 +67,7 @@ class TraineeControllerTest {
         mockMvc.perform(post("/api/trainees")
                         .contentType("application/json")
                         .content(objectMapper.writeValueAsString(body)))
-                .andExpect(status().isCreated())
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.username").value("John.Smith"))
                 .andExpect(jsonPath("$.password").value("genPass"));
     }
@@ -140,7 +140,7 @@ class TraineeControllerTest {
         mockMvc.perform(delete("/api/trainees/John.Smith")
                         .header("X-Auth-Username", "John.Smith")
                         .header("X-Auth-Password", "raw"))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isOk());
 
         verify(traineeService).delete("John.Smith", "raw");
     }

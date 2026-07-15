@@ -49,7 +49,7 @@ public class TraineeController {
         CredentialsResponse credentials = traineeService.create(
                 request.firstName(), request.lastName(),
                 request.dateOfBirth(), request.address());
-        return ResponseEntity.status(HttpStatus.CREATED).body(credentials);
+        return ResponseEntity.ok(credentials);
     }
 
     // ---------- Endpoint 5: Get trainee profile ----------
@@ -86,7 +86,7 @@ public class TraineeController {
             @RequestHeader(AUTH_PASS) String authPass) {
         log.info("DELETE /api/trainees/{}", username);
         traineeService.delete(authUser, authPass);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok().build();
     }
 
     // ---------- Endpoint 15: Activate / deactivate ----------

@@ -1,7 +1,6 @@
 package com.epam.gym.controller;
 
 import com.epam.gym.dto.request.ChangePasswordRequest;
-import com.epam.gym.dto.request.LoginRequest;
 import com.epam.gym.service.AuthService;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
@@ -21,11 +20,13 @@ public class AuthController {
         this.authService = authService;
     }
 
-    // ---------- Endpoint 3: Login ----------
-    @PostMapping("/login")
-    public ResponseEntity<Void> login(@Valid @RequestBody LoginRequest request) {
-        log.info("POST /api/login — user '{}'", request.username());
-        authService.authenticate(request.username(), request.password());
+    // ---------- Endpoint 3: Login (GET) ----------
+    @GetMapping("/login")
+    public ResponseEntity<Void> login(
+            @RequestHeader("X-Auth-Username") String username,
+            @RequestHeader("X-Auth-Password") String password) {
+        log.info("GET /api/login — user '{}'", username);
+        authService.authenticate(username, password);
         return ResponseEntity.ok().build();
     }
 

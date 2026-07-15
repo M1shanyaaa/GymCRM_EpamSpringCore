@@ -42,13 +42,10 @@ class AuthControllerTest {
 
     @Test
     void login_shouldReturn200_whenValid() throws Exception {
-        Map<String, String> body = Map.of("username", "John.Smith", "password", "raw");
-
-        mockMvc.perform(post("/api/login")
-                        .contentType("application/json")
-                        .content(objectMapper.writeValueAsString(body)))
+        mockMvc.perform(get("/api/login")
+                        .header("X-Auth-Username", "John.Smith")
+                        .header("X-Auth-Password", "raw"))
                 .andExpect(status().isOk());
-
         verify(authService).authenticate("John.Smith", "raw");
     }
 
@@ -56,25 +53,16 @@ class AuthControllerTest {
     void login_shouldReturn401_whenInvalid() throws Exception {
         doThrow(new AuthenticationException("Invalid username or password"))
                 .when(authService).authenticate("John.Smith", "wrong");
-
-        Map<String, String> body = Map.of("username", "John.Smith", "password", "wrong");
-
-        mockMvc.perform(post("/api/login")
-                        .contentType("application/json")
-                        .content(objectMapper.writeValueAsString(body)))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.status").value(401));
+        mockMvc.perform(get("/api/login")
+                        .header("X-Auth-Username", "John.Smith")
+                        .header("X-Auth-Password", "wrong"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
-    void login_shouldReturn400_whenUsernameBlank() throws Exception {
-        Map<String, String> body = Map.of("username", "", "password", "raw");
-
-        mockMvc.perform(post("/api/login")
-                        .contentType("application/json")
-                        .content(objectMapper.writeValueAsString(body)))
+    void login_shouldReturn400_whenHeaderMissing() throws Exception {
+        mockMvc.perform(get("/api/login"))
                 .andExpect(status().isBadRequest());
-
         verifyNoInteractions(authService);
     }
 

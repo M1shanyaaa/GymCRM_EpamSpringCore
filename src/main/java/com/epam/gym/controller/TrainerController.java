@@ -40,13 +40,11 @@ public class TrainerController {
 
     // ---------- Endpoint 2: Register trainer (no auth needed) ----------
     @PostMapping
-    public ResponseEntity<CredentialsResponse> register(
-            @Valid @RequestBody TrainerRegistrationRequest request) {
-        log.info("POST /api/trainers — register '{} {}'",
-                request.firstName(), request.lastName());
+    public ResponseEntity<CredentialsResponse> register( @Valid @RequestBody TrainerRegistrationRequest request) {
+        log.info("POST /api/trainers — register '{} {}'", request.firstName(), request.lastName());
         CredentialsResponse credentials = trainerService.create(
                 request.firstName(), request.lastName(), request.specialization());
-        return ResponseEntity.status(HttpStatus.CREATED).body(credentials);
+        return ResponseEntity.ok(credentials);
     }
 
     // ---------- Endpoint 8: Get trainer profile ----------

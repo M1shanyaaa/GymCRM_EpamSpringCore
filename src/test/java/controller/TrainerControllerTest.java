@@ -53,7 +53,7 @@ class TrainerControllerTest {
     }
 
     @Test
-    void register_shouldReturn201WithCredentials() throws Exception {
+    void register_shouldReturn200WithCredentials() throws Exception {
         when(trainerService.create("Bruce", "Wayne", TrainingTypeName.STRENGTH))
                 .thenReturn(new CredentialsResponse("Bruce.Wayne", "genPass"));
 
@@ -65,7 +65,7 @@ class TrainerControllerTest {
         mockMvc.perform(post("/api/trainers")
                         .contentType("application/json")
                         .content(objectMapper.writeValueAsString(body)))
-                .andExpect(status().isCreated())
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.username").value("Bruce.Wayne"))
                 .andExpect(jsonPath("$.password").value("genPass"));
     }
