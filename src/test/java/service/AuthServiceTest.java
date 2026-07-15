@@ -16,7 +16,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
@@ -90,5 +90,27 @@ class AuthServiceTest {
         assertThatThrownBy(() -> authService.authenticate("John.Smith", "bad"))
                 .isInstanceOf(AuthenticationException.class)
                 .hasMessageContaining("Invalid username or password");
+    }
+
+    @Test
+    void changePassword_shouldEncodeAndSave_whenOldValid() {
+        when(userDao.findByUsername("John.Smith")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("raw", "hashed")).thenReturn(true);
+        when(passwordEncoder.encode("newRaw")).thenReturn("newHashed");
+
+        authService.changePassword("John.Smith", "raw", "newRaw");
+
+        assertThat(user.getPassword()).isEqualTo("newHashed");
+        verify(userDao).update(user);
+    }
+
+    @Test
+    void changePassword_shouldThrow_whenOldPasswordWrong() {
+        when(userDao.findByUsername("John.Smith")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("wrong", "hashed")).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.changePassword("John.Smith", "wrong", "newRaw"))
+                .isInstanceOf(AuthenticationException.class);
+        verify(userDao, never()).update(any());
     }
 }
