@@ -3,6 +3,7 @@ package com.epam.gym.exception;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -16,6 +17,7 @@ import java.util.stream.Collectors;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private static final String TRANSACTION_ID_KEY = "transactionId";
 
     // 404 — entity not found
     @ExceptionHandler(EntityNotFoundException.class)
@@ -76,6 +78,10 @@ public class GlobalExceptionHandler {
 
     private ResponseEntity<ErrorResponse> build(HttpStatus status, String message,
                                                 HttpServletRequest request) {
+
+        // Retrieve transactionId from MDC (can be passed to ErrorResponse later if needed)
+        String txId = MDC.get(TRANSACTION_ID_KEY);
+
         ErrorResponse body = ErrorResponse.of(
                 status.value(),
                 status.getReasonPhrase(),
