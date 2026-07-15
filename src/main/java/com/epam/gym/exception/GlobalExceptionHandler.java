@@ -61,6 +61,15 @@ public class GlobalExceptionHandler {
                 "An unexpected error occurred", request);
     }
 
+    @ExceptionHandler(org.springframework.web.bind.MissingRequestHeaderException.class)
+    public ResponseEntity<ErrorResponse> handleMissingHeader(
+            org.springframework.web.bind.MissingRequestHeaderException ex,
+            HttpServletRequest request) {
+        log.warn("Missing header: {}", ex.getHeaderName());
+        return build(HttpStatus.BAD_REQUEST,
+                "Missing required header: " + ex.getHeaderName(), request);
+    }
+
     private String formatFieldError(FieldError fe) {
         return fe.getField() + ": " + fe.getDefaultMessage();
     }
