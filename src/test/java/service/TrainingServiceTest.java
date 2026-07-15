@@ -3,7 +3,13 @@ package service;
 import com.epam.gym.dao.TraineeDao;
 import com.epam.gym.dao.TrainerDao;
 import com.epam.gym.dao.TrainingDao;
+import com.epam.gym.dao.TrainingTypeDao;
+import com.epam.gym.dto.response.TrainerShortResponse;
+import com.epam.gym.dto.response.TrainingResponse;
+import com.epam.gym.dto.response.TrainingTypeResponse;
 import com.epam.gym.exception.EntityNotFoundException;
+import com.epam.gym.mapper.TrainerMapper;
+import com.epam.gym.mapper.TrainingMapper;
 import com.epam.gym.model.*;
 import com.epam.gym.service.AuthService;
 import com.epam.gym.service.TrainingService;
@@ -19,11 +25,11 @@ import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -32,7 +38,10 @@ class TrainingServiceTest {
     @Mock private TrainingDao trainingDao;
     @Mock private TraineeDao traineeDao;
     @Mock private TrainerDao trainerDao;
+    @Mock private TrainingTypeDao trainingTypeDao;
     @Mock private AuthService authService;
+    @Mock private TrainingMapper trainingMapper;
+    @Mock private TrainerMapper trainerMapper;
 
     @InjectMocks
     private TrainingService trainingService;
@@ -72,7 +81,7 @@ class TrainingServiceTest {
         when(trainerDao.findByUsername("Bruce.Wayne")).thenReturn(Optional.of(trainer));
         when(trainingDao.save(any(Training.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        Training result = trainingService.addTraining(
+        trainingService.addTraining(
                 "John.Smith", "raw",
                 "John.Smith", "Bruce.Wayne",
                 "Strength Session", LocalDate.now(), 45);
@@ -86,11 +95,9 @@ class TrainingServiceTest {
         assertThat(saved.getTrainingName()).isEqualTo("Strength Session");
         assertThat(saved.getTrainingType()).isEqualTo(strengthType);
         assertThat(saved.getTrainingDuration()).isEqualTo(45);
-        // trainer linked to trainee (M:M)
         assertThat(trainee.getTrainers()).contains(trainer);
         verify(traineeDao).update(trainee);
         verify(authService).authenticate("John.Smith", "raw");
-        assertThat(result).isNotNull();
     }
 
     @Test
@@ -144,15 +151,18 @@ class TrainingServiceTest {
     // ---------- getTraineeTrainings ----------
 
     @Test
-    void getTraineeTrainings_shouldDelegateToDao() {
-        List<Training> expected = List.of(new Training());
-        when(trainingDao.findTraineeTrainings(
-                "John.Smith", null, null, null, null)).thenReturn(expected);
+    void getTraineeTrainings_shouldDelegateToDaoAndMap() {
+        List<Training> entities = List.of(new Training());
+        List<TrainingResponse> mapped = List.of(new TrainingResponse(
+                "S", LocalDate.now(), TrainingTypeName.STRENGTH, 45, "Bruce", "John"));
+        when(trainingDao.findTraineeTrainings("John.Smith", null, null, null, null))
+                .thenReturn(entities);
+        when(trainingMapper.toResponseList(entities)).thenReturn(mapped);
 
-        List<Training> result = trainingService.getTraineeTrainings(
+        List<TrainingResponse> result = trainingService.getTraineeTrainings(
                 "John.Smith", "raw", null, null, null, null);
 
-        assertThat(result).isEqualTo(expected);
+        assertThat(result).isEqualTo(mapped);
         verify(authService).authenticate("John.Smith", "raw");
     }
 
@@ -163,6 +173,7 @@ class TrainingServiceTest {
         when(trainingDao.findTraineeTrainings(
                 "John.Smith", from, to, "Bruce", TrainingTypeName.STRENGTH))
                 .thenReturn(List.of());
+        when(trainingMapper.toResponseList(anyList())).thenReturn(List.of());
 
         trainingService.getTraineeTrainings(
                 "John.Smith", "raw", from, to, "Bruce", TrainingTypeName.STRENGTH);
@@ -174,31 +185,38 @@ class TrainingServiceTest {
     // ---------- getTrainerTrainings ----------
 
     @Test
-    void getTrainerTrainings_shouldDelegateToDao() {
-        List<Training> expected = List.of(new Training());
-        when(trainingDao.findTrainerTrainings(
-                "Bruce.Wayne", null, null, null)).thenReturn(expected);
+    void getTrainerTrainings_shouldDelegateToDaoAndMap() {
+        List<Training> entities = List.of(new Training());
+        List<TrainingResponse> mapped = List.of(new TrainingResponse(
+                "S", LocalDate.now(), TrainingTypeName.STRENGTH, 45, "Bruce", "John"));
+        when(trainingDao.findTrainerTrainings("Bruce.Wayne", null, null, null))
+                .thenReturn(entities);
+        when(trainingMapper.toResponseList(entities)).thenReturn(mapped);
 
-        List<Training> result = trainingService.getTrainerTrainings(
+        List<TrainingResponse> result = trainingService.getTrainerTrainings(
                 "Bruce.Wayne", "raw", null, null, null);
 
-        assertThat(result).isEqualTo(expected);
+        assertThat(result).isEqualTo(mapped);
         verify(authService).authenticate("Bruce.Wayne", "raw");
     }
 
     // ---------- updateTraineeTrainers ----------
 
     @Test
-    void updateTraineeTrainers_shouldReplaceTrainersSet() {
+    void updateTraineeTrainers_shouldReplaceTrainersSetAndReturnShortList() {
         when(traineeDao.findByUsername("John.Smith")).thenReturn(Optional.of(trainee));
         when(trainerDao.findByUsernames(List.of("Bruce.Wayne")))
                 .thenReturn(List.of(trainer));
         when(traineeDao.update(any(Trainee.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(trainerMapper.toShortList(anyList()))
+                .thenReturn(List.of(new TrainerShortResponse(
+                        "Bruce.Wayne", "Bruce", "Wayne", TrainingTypeName.STRENGTH)));
 
-        Set<Trainer> result = trainingService.updateTraineeTrainers(
+        List<TrainerShortResponse> result = trainingService.updateTraineeTrainers(
                 "John.Smith", "raw", List.of("Bruce.Wayne"));
 
-        assertThat(result).containsExactly(trainer);
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).username()).isEqualTo("Bruce.Wayne");
         assertThat(trainee.getTrainers()).containsExactly(trainer);
         verify(authService).authenticate("John.Smith", "raw");
     }
@@ -224,11 +242,26 @@ class TrainingServiceTest {
     void updateTraineeTrainers_shouldThrow_whenSomeTrainerMissing() {
         when(traineeDao.findByUsername("John.Smith")).thenReturn(Optional.of(trainee));
         when(trainerDao.findByUsernames(List.of("Bruce.Wayne", "Ghost")))
-                .thenReturn(List.of(trainer)); // only 1 of 2 found
+                .thenReturn(List.of(trainer));
 
         assertThatThrownBy(() -> trainingService.updateTraineeTrainers(
                 "John.Smith", "raw", List.of("Bruce.Wayne", "Ghost")))
                 .isInstanceOf(EntityNotFoundException.class);
         verify(traineeDao, never()).update(any());
+    }
+
+    // ---------- getTrainingTypes ----------
+
+    @Test
+    void getTrainingTypes_shouldReturnMappedList() {
+        List<TrainingType> types = List.of(strengthType);
+        when(trainingTypeDao.findAll()).thenReturn(types);
+        when(trainingMapper.toTypeResponseList(types))
+                .thenReturn(List.of(new TrainingTypeResponse(TrainingTypeName.STRENGTH, 1L)));
+
+        List<TrainingTypeResponse> result = trainingService.getTrainingTypes();
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).trainingType()).isEqualTo(TrainingTypeName.STRENGTH);
     }
 }
