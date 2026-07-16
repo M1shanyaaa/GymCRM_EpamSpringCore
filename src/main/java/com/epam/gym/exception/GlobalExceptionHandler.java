@@ -78,15 +78,14 @@ public class GlobalExceptionHandler {
 
     private ResponseEntity<ErrorResponse> build(HttpStatus status, String message,
                                                 HttpServletRequest request) {
-
-        // Retrieve transactionId from MDC (can be passed to ErrorResponse later if needed)
         String txId = MDC.get(TRANSACTION_ID_KEY);
 
         ErrorResponse body = ErrorResponse.of(
                 status.value(),
                 status.getReasonPhrase(),
                 message,
-                request.getRequestURI());
+                request.getRequestURI(),
+                txId);
         return ResponseEntity.status(status).body(body);
     }
 }

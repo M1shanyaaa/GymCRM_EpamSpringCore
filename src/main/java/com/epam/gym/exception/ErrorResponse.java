@@ -8,9 +8,11 @@ public record ErrorResponse(
         int status,
         String error,
         String message,
-        String path
+        String path,
+        String transactionId
 ) {
-    public static ErrorResponse of(int status, String error, String message, String path) {
-        return new ErrorResponse(Instant.now(), status, error, message, path);
+    public static ErrorResponse of(int status, String error, String message,
+                                   String path, String transactionId) {
+        return new ErrorResponse(Instant.now(), status, error, message, path, transactionId);
     }
 }
