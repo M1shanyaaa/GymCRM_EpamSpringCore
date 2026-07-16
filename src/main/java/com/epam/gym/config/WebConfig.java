@@ -2,12 +2,20 @@ package com.epam.gym.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.springdoc.core.configuration.SpringDocConfiguration;
+import org.springdoc.core.properties.SpringDocConfigProperties;
+import org.springdoc.core.properties.SwaggerUiConfigParameters;
+import org.springdoc.core.properties.SwaggerUiConfigProperties;
+import org.springdoc.core.properties.SwaggerUiOAuthProperties;
+import org.springdoc.webmvc.core.configuration.SpringDocWebMvcConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.util.List;
@@ -19,6 +27,11 @@ import java.util.List;
  */
 @Configuration
 @EnableWebMvc
+@Import({
+        SpringDocConfiguration.class,
+        SpringDocWebMvcConfiguration.class,
+        org.springdoc.webmvc.ui.SwaggerConfig.class,
+})
 public class WebConfig implements WebMvcConfigurer {
 
     @Bean
@@ -30,8 +43,44 @@ public class WebConfig implements WebMvcConfigurer {
         return mapper;
     }
 
+
     @Override
-    public void configureMessageConverters(List<HttpMessageConverter<?>> converters) {
-        converters.add(new MappingJackson2HttpMessageConverter(objectMapper()));
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        registry.addResourceHandler("/swagger-ui/**")
+                .addResourceLocations("classpath:/META-INF/resources/webjars/swagger-ui/");
+
+        registry.addResourceHandler("/webjars/**")
+                .addResourceLocations("classpath:/META-INF/resources/webjars/");
+    }
+
+    @Bean
+    public SwaggerUiConfigProperties swaggerUiConfigProperties() {
+        return new SwaggerUiConfigProperties();
+    }
+
+    @Bean
+    public SpringDocConfigProperties springDocConfigProperties() {
+        return new SpringDocConfigProperties();
+    }
+
+    @Bean
+    public SwaggerUiConfigParameters swaggerUiConfigParameters(
+            SwaggerUiConfigProperties swaggerUiConfigProperties) {
+        return new SwaggerUiConfigParameters(swaggerUiConfigProperties);
+    }
+
+    @Bean
+    public SwaggerUiOAuthProperties swaggerUiOAuthProperties() {
+        return new SwaggerUiOAuthProperties();
+    }
+
+    @Override
+    public void extendMessageConverters(List<HttpMessageConverter<?>> converters) {
+        for (HttpMessageConverter<?> converter : converters) {
+            if (converter instanceof MappingJackson2HttpMessageConverter mappingConverter) {
+                mappingConverter.setObjectMapper(objectMapper());
+                break;
+            }
+        }
     }
 }
