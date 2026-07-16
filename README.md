@@ -2,23 +2,29 @@
 
 A simple in-memory Gym CRM system built with **Spring Core** (no Spring Boot).
 Manages trainees, trainers and trainings with profile creation, username/password
-generation and CSV-based data initialization at startup.
-
-# TODO: 
-replace long parameter lists in service methods (create/update)
-with request DTOs — planned for the REST module.
+generation
 
 ## Tech Stack
 
 - Java 17
-- Spring Core 6 (annotation-based configuration)
+- Spring Core 6 (MVC, ORM, Security Crypto)
 - Lombok
-- OpenCSV
+- Hibernate 6 / JPA
+- PostgreSQL 16 + HikariCP
 - SLF4J + Logback
+- MapStruct 1.5.5 (DTO <-> Entity mapping)
+- Embedded Apache Tomcat 10
+- Swagger / OpenAPI (springdoc)
 - JUnit 5, Mockito, AssertJ
 - Maven
+- JaCoCo (code coverage)
 
+## Prerequisites
 
+- JDK 17+
+- Maven 3.9+
+- Docker & Docker Compose (for PostgreSQL)
+- 
 ### Key components
 
 | Layer | Responsibility |
@@ -68,7 +74,16 @@ Run the demo (App.java):
 ```bash
 mvn exec:java -Dexec.mainClass="com.epam.gym.App"
 ```
+Or run App.main() from IDE.
+The application starts an embedded Tomcat on:
+```bash
+http://localhost:8080
+```
+Swagger UI:
 
+```bash
+http://localhost:8080/swagger-ui/index.html
+```
 ### Tests
 Run all unit tests:
 
@@ -77,5 +92,4 @@ mvn test
 ```
 ### Tests coverage
 
-<img width="546" height="247" alt="Знімок екрана 2026-06-23 154403" src="https://github.com/user-attachments/assets/5d332a8f-deff-4237-b106-bcdd993747ae" />
-
+![img.png](img.png)
