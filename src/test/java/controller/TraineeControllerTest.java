@@ -86,7 +86,7 @@ class TraineeControllerTest {
 
     @Test
     void getProfile_shouldReturnProfile() throws Exception {
-        when(traineeService.getProfile("John.Smith", "raw"))
+        when(traineeService.getProfile("John.Smith"))
                 .thenReturn(new TraineeProfileResponse(
                         "John", "Smith", LocalDate.of(1990, 1, 1),
                         "Kyiv", true, List.of()));
@@ -100,7 +100,7 @@ class TraineeControllerTest {
 
     @Test
     void getProfile_shouldReturn404_whenNotFound() throws Exception {
-        when(traineeService.getProfile("Ghost", "raw"))
+        when(traineeService.getProfile("Ghost"))
                 .thenThrow(new EntityNotFoundException("Trainee not found: Ghost"));
 
         mockMvc.perform(get("/api/trainees/Ghost")
@@ -111,8 +111,16 @@ class TraineeControllerTest {
     }
 
     @Test
+    void getProfile_shouldReturn400_whenPasswordHeaderMissing() throws Exception {
+        mockMvc.perform(get("/api/trainees/John.Smith"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(traineeService);
+    }
+
+    @Test
     void update_shouldReturnUpdatedProfile() throws Exception {
-        when(traineeService.update(eq("John.Smith"), eq("raw"),
+        when(traineeService.update(eq("John.Smith"),
                 eq("John"), eq("Doe"), any(), eq("Lviv"), eq(true)))
                 .thenReturn(new TraineeProfileResponse(
                         "John", "Doe", LocalDate.of(1990, 1, 1),
@@ -136,13 +144,13 @@ class TraineeControllerTest {
     }
 
     @Test
-    void delete_shouldReturn204() throws Exception {
+    void delete_shouldReturn200() throws Exception {
         mockMvc.perform(delete("/api/trainees/John.Smith")
                         .header("X-Auth-Username", "John.Smith")
                         .header("X-Auth-Password", "raw"))
                 .andExpect(status().isOk());
 
-        verify(traineeService).delete("John.Smith", "raw");
+        verify(traineeService).delete("John.Smith");
     }
 
     @Test
@@ -156,13 +164,13 @@ class TraineeControllerTest {
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isOk());
 
-        verify(traineeService).setActive("John.Smith", "raw", false);
+        verify(traineeService).setActive("John.Smith", false);
     }
 
     @Test
     void updateTrainers_shouldReturnList() throws Exception {
         when(trainingService.updateTraineeTrainers(
-                eq("John.Smith"), eq("raw"), eq(List.of("Bruce.Wayne"))))
+                eq("John.Smith"), eq(List.of("Bruce.Wayne"))))
                 .thenReturn(List.of(new TrainerShortResponse(
                         "Bruce.Wayne", "Bruce", "Wayne", TrainingTypeName.STRENGTH)));
 
@@ -195,7 +203,7 @@ class TraineeControllerTest {
     @Test
     void getTrainings_shouldReturnList() throws Exception {
         when(trainingService.getTraineeTrainings(
-                eq("John.Smith"), eq("raw"), any(), any(), any(), any()))
+                eq("John.Smith"), any(), any(), any(), any()))
                 .thenReturn(List.of(new TrainingResponse(
                         "S", LocalDate.now(),
                         TrainingTypeName.STRENGTH, 45, "Bruce", "John")));

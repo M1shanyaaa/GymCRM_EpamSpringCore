@@ -23,6 +23,17 @@ import org.springframework.util.StringUtils;
 
 import java.util.List;
 
+/**
+ * Business logic for Trainer entities.
+ * <p>
+ * Authentication for every method below except {@link #create} is enforced
+ * globally by {@code AuthenticationInterceptor} before the request ever
+ * reaches this service. This service therefore has no dependency on
+ * {@link AuthService}.
+ * <p>
+ * Password changes are handled exclusively by {@link AuthService#changePassword}
+ * (see {@code AuthController}) — do not duplicate that logic here.
+ */
 @Service
 public class TrainerService {
 
@@ -33,7 +44,6 @@ public class TrainerService {
     private final UsernameGenerator usernameGenerator;
     private final PasswordGenerator passwordGenerator;
     private final PasswordEncoder passwordEncoder;
-    private final AuthService authService;
     private final TrainerMapper trainerMapper;
 
     @Autowired
@@ -42,18 +52,16 @@ public class TrainerService {
                           UsernameGenerator usernameGenerator,
                           PasswordGenerator passwordGenerator,
                           PasswordEncoder passwordEncoder,
-                          AuthService authService,
                           TrainerMapper trainerMapper) {
         this.trainerDao = trainerDao;
         this.trainingTypeDao = trainingTypeDao;
         this.usernameGenerator = usernameGenerator;
         this.passwordGenerator = passwordGenerator;
         this.passwordEncoder = passwordEncoder;
-        this.authService = authService;
         this.trainerMapper = trainerMapper;
     }
 
-    // ---------- Endpoint 2: Trainer registration ----------
+    // ---------- Endpoint 2: Trainer registration (public, no auth) ----------
     @Transactional
     public CredentialsResponse create(String firstName, String lastName,
                                       TrainingTypeName specialization) {
@@ -90,33 +98,16 @@ public class TrainerService {
 
     // ---------- Endpoint 8: Get Trainer profile ----------
     @Transactional(readOnly = true)
-    public TrainerProfileResponse getProfile(String username, String password) {
-        authService.authenticate(username, password);
+    public TrainerProfileResponse getProfile(String username) {
         Trainer trainer = getTrainerOrThrow(username);
         return trainerMapper.toProfile(trainer);
     }
 
-    // ---------- Endpoint 4: Change password ----------
-    @Transactional
-    public void changePassword(String username, String oldPassword, String newPassword) {
-        authService.authenticate(username, oldPassword);
-
-        if (!StringUtils.hasText(newPassword)) {
-            throw new IllegalArgumentException("New password must not be blank");
-        }
-
-        Trainer trainer = getTrainerOrThrow(username);
-        trainer.getUser().setPassword(passwordEncoder.encode(newPassword));
-        trainerDao.update(trainer);
-        log.info("Password changed for trainer '{}'", username);
-    }
-
     // ---------- Endpoint 9: Update Trainer profile (specialization is read-only) ----------
     @Transactional
-    public TrainerProfileResponse update(String username, String password,
+    public TrainerProfileResponse update(String username,
                                          String firstName, String lastName,
                                          boolean isActive) {
-        authService.authenticate(username, password);
         validateRequired(firstName, lastName);
 
         Trainer trainer = getTrainerOrThrow(username);
@@ -132,9 +123,7 @@ public class TrainerService {
 
     // ---------- Endpoint 16: Activate/De-activate ----------
     @Transactional
-    public void setActive(String username, String password, boolean isActive) {
-        authService.authenticate(username, password);
-
+    public void setActive(String username, boolean isActive) {
         Trainer trainer = getTrainerOrThrow(username);
         trainer.getUser().setActive(isActive);
         trainerDao.update(trainer);
@@ -143,9 +132,7 @@ public class TrainerService {
 
     // ---------- Endpoint 10: Get not-assigned active trainers ----------
     @Transactional(readOnly = true)
-    public List<TrainerShortResponse> findUnassignedTrainers(String traineeUsername,
-                                                             String password) {
-        authService.authenticate(traineeUsername, password);
+    public List<TrainerShortResponse> findUnassignedTrainers(String traineeUsername) {
         List<Trainer> unassigned = trainerDao.findUnassignedTrainers(traineeUsername);
         return trainerMapper.toShortList(unassigned);
     }

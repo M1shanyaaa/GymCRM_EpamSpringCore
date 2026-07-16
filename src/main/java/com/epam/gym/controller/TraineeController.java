@@ -34,6 +34,12 @@ public class TraineeController {
 
     private static final Logger log = LoggerFactory.getLogger(TraineeController.class);
 
+    // Identity is taken from the {username} path variable everywhere below.
+    // The password header is still declared on each method purely for OpenAPI
+    // documentation and Spring's own required-header validation; actual
+    // authentication is enforced globally by AuthenticationInterceptor before
+    // these methods run, so the value is intentionally NOT forwarded to the
+    // service layer anymore.
     private static final String AUTH_PASS = "X-Auth-Password";
 
     private final TraineeService traineeService;
@@ -77,7 +83,7 @@ public class TraineeController {
             @Parameter(description = "Trainee username") @PathVariable String username,
             @Parameter(description = "Auth password", required = true) @RequestHeader(AUTH_PASS) String password) {
         log.info("GET /api/trainees/{}", username);
-        TraineeProfileResponse profile = traineeService.getProfile(username, password);
+        TraineeProfileResponse profile = traineeService.getProfile(username);
         return ResponseEntity.ok(profile);
     }
 
@@ -97,7 +103,7 @@ public class TraineeController {
             @Parameter(description = "Auth password", required = true) @RequestHeader(AUTH_PASS) String password) {
         log.info("PUT /api/trainees/{}", username);
         TraineeProfileResponse profile = traineeService.update(
-                username, password,
+                username,
                 request.firstName(), request.lastName(),
                 request.dateOfBirth(), request.address(), request.isActive());
         return ResponseEntity.ok(profile);
@@ -116,7 +122,7 @@ public class TraineeController {
             @Parameter(description = "Trainee username") @PathVariable String username,
             @Parameter(description = "Auth password", required = true) @RequestHeader(AUTH_PASS) String password) {
         log.info("DELETE /api/trainees/{}", username);
-        traineeService.delete(username, password);
+        traineeService.delete(username);
         return ResponseEntity.ok().build();
     }
 
@@ -135,7 +141,7 @@ public class TraineeController {
             @Valid @RequestBody ActivateRequest request,
             @Parameter(description = "Auth password", required = true) @RequestHeader(AUTH_PASS) String password) {
         log.info("PATCH /api/trainees/{}/status -> {}", username, request.isActive());
-        traineeService.setActive(username, password, request.isActive());
+        traineeService.setActive(username, request.isActive());
         return ResponseEntity.ok().build();
     }
 
@@ -155,7 +161,7 @@ public class TraineeController {
             @Parameter(description = "Auth password", required = true) @RequestHeader(AUTH_PASS) String password) {
         log.info("PUT /api/trainees/{}/trainers", username);
         List<TrainerShortResponse> trainers = trainingService.updateTraineeTrainers(
-                username, password, request.trainerUsernames());
+                username, request.trainerUsernames());
         return ResponseEntity.ok(trainers);
     }
 
@@ -177,7 +183,7 @@ public class TraineeController {
             @Parameter(description = "Auth password", required = true) @RequestHeader(AUTH_PASS) String password) {
         log.info("GET /api/trainees/{}/trainings", username);
         List<TrainingResponse> trainings = trainingService.getTraineeTrainings(
-                username, password, from, to, trainerName, trainingType);
+                username, from, to, trainerName, trainingType);
         return ResponseEntity.ok(trainings);
     }
 }

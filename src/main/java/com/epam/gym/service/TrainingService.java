@@ -22,6 +22,21 @@ import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
 
+/**
+ * Business logic for Training sessions and training types.
+ * <p>
+ * All methods except {@link #addTraining} and {@link #getTrainingTypes} are
+ * reached only via routes authenticated globally by
+ * {@code AuthenticationInterceptor}, so they no longer need to call
+ * {@link AuthService} themselves.
+ * <p>
+ * {@link #addTraining} is the one remaining exception: its controller
+ * endpoint is still marked {@code @NoAuth} because it authenticates using
+ * credentials from the request body instead of {@code X-Auth-*} headers
+ * (legacy behavior, tracked as a TODO). It therefore still performs its own
+ * explicit authentication call below. Once that endpoint is migrated to
+ * header-based auth, remove {@code authService} usage here too.
+ */
 @Service
 public class TrainingService {
 
@@ -53,6 +68,9 @@ public class TrainingService {
     }
 
     // ---------- Endpoint 14: Add training ----------
+    // NOTE: controller endpoint is @NoAuth (credentials come from the request
+    // body, not headers — see TrainingController TODO), so this is the only
+    // remaining place in this service that must authenticate explicitly.
     @Transactional
     public void addTraining(String callerUsername, String callerPassword,
                             String traineeUsername, String trainerUsername,
@@ -88,11 +106,9 @@ public class TrainingService {
 
     // ---------- Endpoint 12: Trainee trainings by criteria ----------
     @Transactional(readOnly = true)
-    public List<TrainingResponse> getTraineeTrainings(String username, String password,
+    public List<TrainingResponse> getTraineeTrainings(String username,
                                                       LocalDate fromDate, LocalDate toDate,
                                                       String trainerName, TrainingTypeName trainingType) {
-        authService.authenticate(username, password);
-
         List<Training> result = trainingDao.findTraineeTrainings(
                 username, fromDate, toDate, trainerName, trainingType);
         log.debug("Trainee '{}' trainings found: {}", username, result.size());
@@ -101,11 +117,9 @@ public class TrainingService {
 
     // ---------- Endpoint 13: Trainer trainings by criteria ----------
     @Transactional(readOnly = true)
-    public List<TrainingResponse> getTrainerTrainings(String username, String password,
+    public List<TrainingResponse> getTrainerTrainings(String username,
                                                       LocalDate fromDate, LocalDate toDate,
                                                       String traineeName) {
-        authService.authenticate(username, password);
-
         List<Training> result = trainingDao.findTrainerTrainings(
                 username, fromDate, toDate, traineeName);
         log.debug("Trainer '{}' trainings found: {}", username, result.size());
@@ -114,10 +128,8 @@ public class TrainingService {
 
     // ---------- Endpoint 11: Update trainee's trainers list ----------
     @Transactional
-    public List<TrainerShortResponse> updateTraineeTrainers(String traineeUsername, String password,
+    public List<TrainerShortResponse> updateTraineeTrainers(String traineeUsername,
                                                             List<String> trainerUsernames) {
-        authService.authenticate(traineeUsername, password);
-
         if (trainerUsernames == null || trainerUsernames.isEmpty()) {
             throw new IllegalArgumentException("Trainers list must not be empty");
         }
@@ -138,7 +150,7 @@ public class TrainingService {
         return trainerMapper.toShortList(List.copyOf(updated.getTrainers()));
     }
 
-    // ---------- Endpoint 17: Get training types ----------
+    // ---------- Endpoint 17: Get training types (public, no auth) ----------
     @Transactional(readOnly = true)
     public List<TrainingTypeResponse> getTrainingTypes() {
         List<TrainingType> types = trainingTypeDao.findAll();

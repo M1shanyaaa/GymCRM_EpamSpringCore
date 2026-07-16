@@ -7,6 +7,7 @@ import com.epam.gym.dao.TrainingTypeDao;
 import com.epam.gym.dto.response.TrainerShortResponse;
 import com.epam.gym.dto.response.TrainingResponse;
 import com.epam.gym.dto.response.TrainingTypeResponse;
+import com.epam.gym.exception.AuthenticationException;
 import com.epam.gym.exception.EntityNotFoundException;
 import com.epam.gym.mapper.TrainerMapper;
 import com.epam.gym.mapper.TrainingMapper;
@@ -73,7 +74,7 @@ class TrainingServiceTest {
                 .build();
     }
 
-    // ---------- addTraining ----------
+    // ---------- addTraining (still self-authenticating — @NoAuth endpoint) ----------
 
     @Test
     void addTraining_shouldPersistAndLinkTrainerToTrainee() {
@@ -98,6 +99,18 @@ class TrainingServiceTest {
         assertThat(trainee.getTrainers()).contains(trainer);
         verify(traineeDao).update(trainee);
         verify(authService).authenticate("John.Smith", "raw");
+    }
+
+    @Test
+    void addTraining_shouldThrow_whenAuthFails() {
+        doThrow(new AuthenticationException("bad"))
+                .when(authService).authenticate("John.Smith", "wrong");
+
+        assertThatThrownBy(() -> trainingService.addTraining(
+                "John.Smith", "wrong", "John.Smith", "Bruce.Wayne",
+                "Session", LocalDate.now(), 30))
+                .isInstanceOf(AuthenticationException.class);
+        verify(trainingDao, never()).save(any());
     }
 
     @Test
@@ -160,10 +173,10 @@ class TrainingServiceTest {
         when(trainingMapper.toResponseList(entities)).thenReturn(mapped);
 
         List<TrainingResponse> result = trainingService.getTraineeTrainings(
-                "John.Smith", "raw", null, null, null, null);
+                "John.Smith", null, null, null, null);
 
         assertThat(result).isEqualTo(mapped);
-        verify(authService).authenticate("John.Smith", "raw");
+        verifyNoInteractions(authService);
     }
 
     @Test
@@ -176,7 +189,7 @@ class TrainingServiceTest {
         when(trainingMapper.toResponseList(anyList())).thenReturn(List.of());
 
         trainingService.getTraineeTrainings(
-                "John.Smith", "raw", from, to, "Bruce", TrainingTypeName.STRENGTH);
+                "John.Smith", from, to, "Bruce", TrainingTypeName.STRENGTH);
 
         verify(trainingDao).findTraineeTrainings(
                 "John.Smith", from, to, "Bruce", TrainingTypeName.STRENGTH);
@@ -194,10 +207,10 @@ class TrainingServiceTest {
         when(trainingMapper.toResponseList(entities)).thenReturn(mapped);
 
         List<TrainingResponse> result = trainingService.getTrainerTrainings(
-                "Bruce.Wayne", "raw", null, null, null);
+                "Bruce.Wayne", null, null, null);
 
         assertThat(result).isEqualTo(mapped);
-        verify(authService).authenticate("Bruce.Wayne", "raw");
+        verifyNoInteractions(authService);
     }
 
     // ---------- updateTraineeTrainers ----------
@@ -213,18 +226,18 @@ class TrainingServiceTest {
                         "Bruce.Wayne", "Bruce", "Wayne", TrainingTypeName.STRENGTH)));
 
         List<TrainerShortResponse> result = trainingService.updateTraineeTrainers(
-                "John.Smith", "raw", List.of("Bruce.Wayne"));
+                "John.Smith", List.of("Bruce.Wayne"));
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).username()).isEqualTo("Bruce.Wayne");
         assertThat(trainee.getTrainers()).containsExactly(trainer);
-        verify(authService).authenticate("John.Smith", "raw");
+        verifyNoInteractions(authService);
     }
 
     @Test
     void updateTraineeTrainers_shouldThrow_whenListEmpty() {
         assertThatThrownBy(() -> trainingService.updateTraineeTrainers(
-                "John.Smith", "raw", List.of()))
+                "John.Smith", List.of()))
                 .isInstanceOf(IllegalArgumentException.class);
         verify(traineeDao, never()).update(any());
     }
@@ -234,7 +247,7 @@ class TrainingServiceTest {
         when(traineeDao.findByUsername("Ghost")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> trainingService.updateTraineeTrainers(
-                "Ghost", "raw", List.of("Bruce.Wayne")))
+                "Ghost", List.of("Bruce.Wayne")))
                 .isInstanceOf(EntityNotFoundException.class);
     }
 
@@ -245,7 +258,7 @@ class TrainingServiceTest {
                 .thenReturn(List.of(trainer));
 
         assertThatThrownBy(() -> trainingService.updateTraineeTrainers(
-                "John.Smith", "raw", List.of("Bruce.Wayne", "Ghost")))
+                "John.Smith", List.of("Bruce.Wayne", "Ghost")))
                 .isInstanceOf(EntityNotFoundException.class);
         verify(traineeDao, never()).update(any());
     }
@@ -263,5 +276,6 @@ class TrainingServiceTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).trainingType()).isEqualTo(TrainingTypeName.STRENGTH);
+        verifyNoInteractions(authService);
     }
 }

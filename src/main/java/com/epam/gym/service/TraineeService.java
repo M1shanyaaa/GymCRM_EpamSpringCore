@@ -19,6 +19,18 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 
+/**
+ * Business logic for Trainee entities.
+ * <p>
+ * Authentication for every method below except {@link #create} is enforced
+ * globally by {@code AuthenticationInterceptor} before the request ever
+ * reaches this service — by the time these methods run, the caller is
+ * already guaranteed to be authenticated as exactly the {@code username}
+ * passed in. This service therefore has no dependency on {@link AuthService}.
+ * <p>
+ * Password changes are handled exclusively by {@link AuthService#changePassword}
+ * (see {@code AuthController}) — do not duplicate that logic here.
+ */
 @Service
 public class TraineeService {
 
@@ -28,7 +40,6 @@ public class TraineeService {
     private final UsernameGenerator usernameGenerator;
     private final PasswordGenerator passwordGenerator;
     private final PasswordEncoder passwordEncoder;
-    private final AuthService authService;
     private final TraineeMapper traineeMapper;
 
     @Autowired
@@ -36,17 +47,15 @@ public class TraineeService {
                           UsernameGenerator usernameGenerator,
                           PasswordGenerator passwordGenerator,
                           PasswordEncoder passwordEncoder,
-                          AuthService authService,
                           TraineeMapper traineeMapper) {
         this.traineeDao = traineeDao;
         this.usernameGenerator = usernameGenerator;
         this.passwordGenerator = passwordGenerator;
         this.passwordEncoder = passwordEncoder;
-        this.authService = authService;
         this.traineeMapper = traineeMapper;
     }
 
-    // ---------- Endpoint 1: Trainee registration ----------
+    // ---------- Endpoint 1: Trainee registration (public, no auth) ----------
     @Transactional
     public CredentialsResponse create(String firstName, String lastName,
                                       LocalDate dateOfBirth, String address) {
@@ -78,34 +87,17 @@ public class TraineeService {
 
     // ---------- Endpoint 5: Get Trainee profile ----------
     @Transactional(readOnly = true)
-    public TraineeProfileResponse getProfile(String username, String password) {
-        authService.authenticate(username, password);
+    public TraineeProfileResponse getProfile(String username) {
         Trainee trainee = getTraineeOrThrow(username);
         return traineeMapper.toProfile(trainee);
     }
 
-    // ---------- Endpoint 4: Change password ----------
-    @Transactional
-    public void changePassword(String username, String oldPassword, String newPassword) {
-        authService.authenticate(username, oldPassword);
-
-        if (!StringUtils.hasText(newPassword)) {
-            throw new IllegalArgumentException("New password must not be blank");
-        }
-
-        Trainee trainee = getTraineeOrThrow(username);
-        trainee.getUser().setPassword(passwordEncoder.encode(newPassword));
-        traineeDao.update(trainee);
-        log.info("Password changed for trainee '{}'", username);
-    }
-
     // ---------- Endpoint 6: Update Trainee profile ----------
     @Transactional
-    public TraineeProfileResponse update(String username, String password,
+    public TraineeProfileResponse update(String username,
                                          String firstName, String lastName,
                                          LocalDate dateOfBirth, String address,
                                          boolean isActive) {
-        authService.authenticate(username, password);
         validateRequired(firstName, lastName);
 
         Trainee trainee = getTraineeOrThrow(username);
@@ -122,9 +114,7 @@ public class TraineeService {
 
     // ---------- Endpoint 15: Activate/De-activate (NOT idempotent per spec) ----------
     @Transactional
-    public void setActive(String username, String password, boolean isActive) {
-        authService.authenticate(username, password);
-
+    public void setActive(String username, boolean isActive) {
         Trainee trainee = getTraineeOrThrow(username);
         trainee.getUser().setActive(isActive);
         traineeDao.update(trainee);
@@ -133,9 +123,7 @@ public class TraineeService {
 
     // ---------- Endpoint 7: Delete Trainee profile (hard delete + cascade) ----------
     @Transactional
-    public void delete(String username, String password) {
-        authService.authenticate(username, password);
-
+    public void delete(String username) {
         Trainee trainee = getTraineeOrThrow(username);
         traineeDao.delete(trainee);
         log.info("Deleted trainee profile '{}' (cascade: user + trainings)", username);

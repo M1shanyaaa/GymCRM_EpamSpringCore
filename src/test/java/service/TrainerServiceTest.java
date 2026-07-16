@@ -5,14 +5,12 @@ import com.epam.gym.dao.TrainingTypeDao;
 import com.epam.gym.dto.response.CredentialsResponse;
 import com.epam.gym.dto.response.TrainerProfileResponse;
 import com.epam.gym.dto.response.TrainerShortResponse;
-import com.epam.gym.exception.AuthenticationException;
 import com.epam.gym.exception.EntityNotFoundException;
 import com.epam.gym.mapper.TrainerMapper;
 import com.epam.gym.model.Trainer;
 import com.epam.gym.model.TrainingType;
 import com.epam.gym.model.TrainingTypeName;
 import com.epam.gym.model.User;
-import com.epam.gym.service.AuthService;
 import com.epam.gym.service.TrainerService;
 import com.epam.gym.util.PasswordGenerator;
 import com.epam.gym.util.UsernameGenerator;
@@ -31,7 +29,6 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -42,7 +39,6 @@ class TrainerServiceTest {
     @Mock private UsernameGenerator usernameGenerator;
     @Mock private PasswordGenerator passwordGenerator;
     @Mock private PasswordEncoder passwordEncoder;
-    @Mock private AuthService authService;
     @Mock private TrainerMapper trainerMapper;
 
     @InjectMocks
@@ -130,55 +126,22 @@ class TrainerServiceTest {
     // ---------- getProfile ----------
 
     @Test
-    void getProfile_shouldReturnProfile_whenAuthenticated() {
+    void getProfile_shouldReturnProfile() {
         when(trainerDao.findByUsername("Bruce.Wayne")).thenReturn(Optional.of(trainer));
         when(trainerMapper.toProfile(trainer)).thenReturn(sampleProfile());
 
-        TrainerProfileResponse result = trainerService.getProfile("Bruce.Wayne", "raw");
+        TrainerProfileResponse result = trainerService.getProfile("Bruce.Wayne");
 
         assertThat(result.firstName()).isEqualTo("Bruce");
         assertThat(result.specialization()).isEqualTo(TrainingTypeName.STRENGTH);
-        verify(authService).authenticate("Bruce.Wayne", "raw");
     }
 
     @Test
     void getProfile_shouldThrow_whenNotFound() {
         when(trainerDao.findByUsername("Ghost")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> trainerService.getProfile("Ghost", "raw"))
+        assertThatThrownBy(() -> trainerService.getProfile("Ghost"))
                 .isInstanceOf(EntityNotFoundException.class);
-    }
-
-    @Test
-    void getProfile_shouldThrow_whenAuthFails() {
-        doThrow(new AuthenticationException("bad"))
-                .when(authService).authenticate("Bruce.Wayne", "wrong");
-
-        assertThatThrownBy(() -> trainerService.getProfile("Bruce.Wayne", "wrong"))
-                .isInstanceOf(AuthenticationException.class);
-        verify(trainerDao, never()).findByUsername(anyString());
-    }
-
-    // ---------- changePassword ----------
-
-    @Test
-    void changePassword_shouldEncodeAndUpdate() {
-        when(trainerDao.findByUsername("Bruce.Wayne")).thenReturn(Optional.of(trainer));
-        when(passwordEncoder.encode("newPass")).thenReturn("newHashed");
-
-        trainerService.changePassword("Bruce.Wayne", "old", "newPass");
-
-        assertThat(trainer.getUser().getPassword()).isEqualTo("newHashed");
-        verify(authService).authenticate("Bruce.Wayne", "old");
-        verify(trainerDao).update(trainer);
-    }
-
-    @Test
-    void changePassword_shouldThrow_whenNewPasswordBlank() {
-        assertThatThrownBy(() ->
-                trainerService.changePassword("Bruce.Wayne", "old", ""))
-                .isInstanceOf(IllegalArgumentException.class);
-        verify(trainerDao, never()).update(any());
     }
 
     // ---------- update (specialization read-only) ----------
@@ -190,23 +153,30 @@ class TrainerServiceTest {
         when(trainerMapper.toProfile(any(Trainer.class))).thenReturn(sampleProfile());
 
         TrainerProfileResponse result = trainerService.update(
-                "Bruce.Wayne", "raw", "Bruce", "Banner", false);
+                "Bruce.Wayne", "Bruce", "Banner", false);
 
         assertThat(trainer.getUser().getLastName()).isEqualTo("Banner");
         assertThat(trainer.getUser().isActive()).isFalse();
-        // specialization unchanged
         assertThat(trainer.getSpecialization()).isEqualTo(strengthType);
         assertThat(result).isNotNull();
-        verify(authService).authenticate("Bruce.Wayne", "raw");
-        // specialization lookup must NOT be triggered on update
         verify(trainingTypeDao, never()).findByName(any());
     }
 
     @Test
     void update_shouldThrow_whenNamesBlank() {
         assertThatThrownBy(() ->
-                trainerService.update("Bruce.Wayne", "raw", "", "", true))
+                trainerService.update("Bruce.Wayne", "", "", true))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void update_shouldThrow_whenNotFound() {
+        when(trainerDao.findByUsername("Ghost")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() ->
+                trainerService.update("Ghost", "Bruce", "Wayne", true))
+                .isInstanceOf(EntityNotFoundException.class);
+        verify(trainerDao, never()).update(any());
     }
 
     // ---------- setActive ----------
@@ -216,7 +186,7 @@ class TrainerServiceTest {
         trainer.getUser().setActive(true);
         when(trainerDao.findByUsername("Bruce.Wayne")).thenReturn(Optional.of(trainer));
 
-        trainerService.setActive("Bruce.Wayne", "raw", false);
+        trainerService.setActive("Bruce.Wayne", false);
 
         assertThat(trainer.getUser().isActive()).isFalse();
         verify(trainerDao).update(trainer);
@@ -227,36 +197,33 @@ class TrainerServiceTest {
         trainer.getUser().setActive(false);
         when(trainerDao.findByUsername("Bruce.Wayne")).thenReturn(Optional.of(trainer));
 
-        trainerService.setActive("Bruce.Wayne", "raw", true);
+        trainerService.setActive("Bruce.Wayne", true);
 
         assertThat(trainer.getUser().isActive()).isTrue();
+    }
+
+    @Test
+    void setActive_shouldThrow_whenNotFound() {
+        when(trainerDao.findByUsername("Ghost")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> trainerService.setActive("Ghost", true))
+                .isInstanceOf(EntityNotFoundException.class);
+        verify(trainerDao, never()).update(any());
     }
 
     // ---------- findUnassignedTrainers ----------
 
     @Test
-    void findUnassignedTrainers_shouldReturnList_whenAuthenticated() {
+    void findUnassignedTrainers_shouldReturnList() {
         when(trainerDao.findUnassignedTrainers("John.Smith")).thenReturn(List.of(trainer));
         when(trainerMapper.toShortList(List.of(trainer)))
                 .thenReturn(List.of(new TrainerShortResponse(
                         "Bruce.Wayne", "Bruce", "Wayne", TrainingTypeName.STRENGTH)));
 
         List<TrainerShortResponse> result =
-                trainerService.findUnassignedTrainers("John.Smith", "raw");
+                trainerService.findUnassignedTrainers("John.Smith");
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).username()).isEqualTo("Bruce.Wayne");
-        verify(authService).authenticate("John.Smith", "raw");
-    }
-
-    @Test
-    void findUnassignedTrainers_shouldThrow_whenAuthFails() {
-        doThrow(new AuthenticationException("bad"))
-                .when(authService).authenticate("John.Smith", "wrong");
-
-        assertThatThrownBy(() ->
-                trainerService.findUnassignedTrainers("John.Smith", "wrong"))
-                .isInstanceOf(AuthenticationException.class);
-        verify(trainerDao, never()).findUnassignedTrainers(anyString());
     }
 }

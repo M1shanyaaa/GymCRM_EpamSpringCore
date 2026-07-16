@@ -87,7 +87,7 @@ class TrainerControllerTest {
 
     @Test
     void getProfile_shouldReturnProfile() throws Exception {
-        when(trainerService.getProfile("Bruce.Wayne", "raw"))
+        when(trainerService.getProfile("Bruce.Wayne"))
                 .thenReturn(new TrainerProfileResponse(
                         "Bruce", "Wayne", TrainingTypeName.STRENGTH, true, List.of()));
 
@@ -101,7 +101,7 @@ class TrainerControllerTest {
 
     @Test
     void getProfile_shouldReturn404_whenNotFound() throws Exception {
-        when(trainerService.getProfile("Ghost", "raw"))
+        when(trainerService.getProfile("Ghost"))
                 .thenThrow(new EntityNotFoundException("Trainer not found: Ghost"));
 
         mockMvc.perform(get("/api/trainers/Ghost")
@@ -113,7 +113,7 @@ class TrainerControllerTest {
 
     @Test
     void update_shouldReturnUpdatedProfile() throws Exception {
-        when(trainerService.update(eq("Bruce.Wayne"), eq("raw"),
+        when(trainerService.update(eq("Bruce.Wayne"),
                 eq("Bruce"), eq("Banner"), eq(false)))
                 .thenReturn(new TrainerProfileResponse(
                         "Bruce", "Banner", TrainingTypeName.STRENGTH, false, List.of()));
@@ -144,12 +144,12 @@ class TrainerControllerTest {
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isOk());
 
-        verify(trainerService).setActive("Bruce.Wayne", "raw", false);
+        verify(trainerService).setActive("Bruce.Wayne", false);
     }
 
     @Test
     void getUnassigned_shouldReturnList() throws Exception {
-        when(trainerService.findUnassignedTrainers("John.Smith", "raw"))
+        when(trainerService.findUnassignedTrainers("John.Smith"))
                 .thenReturn(List.of(new TrainerShortResponse(
                         "Bruce.Wayne", "Bruce", "Wayne", TrainingTypeName.STRENGTH)));
 
@@ -163,7 +163,7 @@ class TrainerControllerTest {
     @Test
     void getTrainings_shouldReturnList() throws Exception {
         when(trainingService.getTrainerTrainings(
-                eq("Bruce.Wayne"), eq("raw"), any(), any(), any()))
+                eq("Bruce.Wayne"), any(), any(), any()))
                 .thenReturn(List.of(new TrainingResponse(
                         "S", java.time.LocalDate.now(),
                         TrainingTypeName.STRENGTH, 45, "Bruce", "John")));
@@ -177,7 +177,7 @@ class TrainerControllerTest {
 
     @Test
     void getProfile_shouldReturn400_whenAuthHeaderMissing() throws Exception {
-        // missing X-Auth-* headers -> MissingRequestHeaderException -> 400
+        // missing X-Auth-Password -> MissingRequestHeaderException -> 400
         mockMvc.perform(get("/api/trainers/Bruce.Wayne"))
                 .andExpect(status().isBadRequest());
     }
