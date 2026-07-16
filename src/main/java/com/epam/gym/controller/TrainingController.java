@@ -2,6 +2,7 @@ package com.epam.gym.controller;
 
 import com.epam.gym.dto.request.AddTrainingRequest;
 import com.epam.gym.dto.response.TrainingTypeResponse;
+import com.epam.gym.security.NoAuth;
 import com.epam.gym.service.TrainingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -30,6 +31,7 @@ public class TrainingController {
 
     // ---------- Endpoint 14: Add training ----------
     @PostMapping
+    @NoAuth
     @Operation(summary = "Add a new training session",
             description = "Creates a new training record associating a trainee and a trainer.")
     @ApiResponses({
@@ -53,6 +55,7 @@ public class TrainingController {
 
     // ---------- Endpoint 17: Get training types ----------
     @GetMapping("/types")
+    @NoAuth
     @Operation(summary = "Get all training types",
             description = "Returns a constant list of all available training types in the system. No authentication required.")
     @ApiResponses({

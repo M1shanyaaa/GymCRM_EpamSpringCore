@@ -9,6 +9,7 @@ import com.epam.gym.dto.response.TraineeProfileResponse;
 import com.epam.gym.dto.response.TrainerShortResponse;
 import com.epam.gym.dto.response.TrainingResponse;
 import com.epam.gym.model.TrainingTypeName;
+import com.epam.gym.security.NoAuth;
 import com.epam.gym.service.TraineeService;
 import com.epam.gym.service.TrainingService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -33,7 +34,6 @@ public class TraineeController {
 
     private static final Logger log = LoggerFactory.getLogger(TraineeController.class);
 
-    private static final String AUTH_USER = "X-Auth-Username";
     private static final String AUTH_PASS = "X-Auth-Password";
 
     private final TraineeService traineeService;
@@ -47,6 +47,7 @@ public class TraineeController {
 
     // ---------- Endpoint 1: Register trainee (no auth) ----------
     @PostMapping
+    @NoAuth
     @Operation(summary = "Register a new trainee",
             description = "Creates a trainee profile; username and password are auto-generated. No authentication required.")
     @ApiResponses({
@@ -66,7 +67,7 @@ public class TraineeController {
     // ---------- Endpoint 5: Get trainee profile ----------
     @GetMapping("/{username}")
     @Operation(summary = "Get trainee profile",
-            description = "Returns the authenticated trainee's profile including assigned trainers.")
+            description = "Returns the trainee's profile including assigned trainers. Requires password confirmation for the given username.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Profile returned"),
             @ApiResponse(responseCode = "401", description = "Invalid credentials"),
@@ -74,10 +75,9 @@ public class TraineeController {
     })
     public ResponseEntity<TraineeProfileResponse> getProfile(
             @Parameter(description = "Trainee username") @PathVariable String username,
-            @Parameter(description = "Auth username", required = true) @RequestHeader(AUTH_USER) String authUser,
-            @Parameter(description = "Auth password", required = true) @RequestHeader(AUTH_PASS) String authPass) {
+            @Parameter(description = "Auth password", required = true) @RequestHeader(AUTH_PASS) String password) {
         log.info("GET /api/trainees/{}", username);
-        TraineeProfileResponse profile = traineeService.getProfile(authUser, authPass);
+        TraineeProfileResponse profile = traineeService.getProfile(username, password);
         return ResponseEntity.ok(profile);
     }
 
@@ -94,11 +94,10 @@ public class TraineeController {
     public ResponseEntity<TraineeProfileResponse> update(
             @Parameter(description = "Trainee username") @PathVariable String username,
             @Valid @RequestBody UpdateTraineeRequest request,
-            @Parameter(description = "Auth username", required = true) @RequestHeader(AUTH_USER) String authUser,
-            @Parameter(description = "Auth password", required = true) @RequestHeader(AUTH_PASS) String authPass) {
+            @Parameter(description = "Auth password", required = true) @RequestHeader(AUTH_PASS) String password) {
         log.info("PUT /api/trainees/{}", username);
         TraineeProfileResponse profile = traineeService.update(
-                authUser, authPass,
+                username, password,
                 request.firstName(), request.lastName(),
                 request.dateOfBirth(), request.address(), request.isActive());
         return ResponseEntity.ok(profile);
@@ -115,10 +114,9 @@ public class TraineeController {
     })
     public ResponseEntity<Void> delete(
             @Parameter(description = "Trainee username") @PathVariable String username,
-            @Parameter(description = "Auth username", required = true) @RequestHeader(AUTH_USER) String authUser,
-            @Parameter(description = "Auth password", required = true) @RequestHeader(AUTH_PASS) String authPass) {
+            @Parameter(description = "Auth password", required = true) @RequestHeader(AUTH_PASS) String password) {
         log.info("DELETE /api/trainees/{}", username);
-        traineeService.delete(authUser, authPass);
+        traineeService.delete(username, password);
         return ResponseEntity.ok().build();
     }
 
@@ -135,10 +133,9 @@ public class TraineeController {
     public ResponseEntity<Void> setActive(
             @Parameter(description = "Trainee username") @PathVariable String username,
             @Valid @RequestBody ActivateRequest request,
-            @Parameter(description = "Auth username", required = true) @RequestHeader(AUTH_USER) String authUser,
-            @Parameter(description = "Auth password", required = true) @RequestHeader(AUTH_PASS) String authPass) {
+            @Parameter(description = "Auth password", required = true) @RequestHeader(AUTH_PASS) String password) {
         log.info("PATCH /api/trainees/{}/status -> {}", username, request.isActive());
-        traineeService.setActive(authUser, authPass, request.isActive());
+        traineeService.setActive(username, password, request.isActive());
         return ResponseEntity.ok().build();
     }
 
@@ -155,11 +152,10 @@ public class TraineeController {
     public ResponseEntity<List<TrainerShortResponse>> updateTrainers(
             @Parameter(description = "Trainee username") @PathVariable String username,
             @Valid @RequestBody UpdateTraineeTrainersRequest request,
-            @Parameter(description = "Auth username", required = true) @RequestHeader(AUTH_USER) String authUser,
-            @Parameter(description = "Auth password", required = true) @RequestHeader(AUTH_PASS) String authPass) {
+            @Parameter(description = "Auth password", required = true) @RequestHeader(AUTH_PASS) String password) {
         log.info("PUT /api/trainees/{}/trainers", username);
         List<TrainerShortResponse> trainers = trainingService.updateTraineeTrainers(
-                authUser, authPass, request.trainerUsernames());
+                username, password, request.trainerUsernames());
         return ResponseEntity.ok(trainers);
     }
 
@@ -178,11 +174,10 @@ public class TraineeController {
             @Parameter(description = "Period to (yyyy-MM-dd)") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @Parameter(description = "Filter by trainer name") @RequestParam(required = false) String trainerName,
             @Parameter(description = "Filter by training type") @RequestParam(required = false) TrainingTypeName trainingType,
-            @Parameter(description = "Auth username", required = true) @RequestHeader(AUTH_USER) String authUser,
-            @Parameter(description = "Auth password", required = true) @RequestHeader(AUTH_PASS) String authPass) {
+            @Parameter(description = "Auth password", required = true) @RequestHeader(AUTH_PASS) String password) {
         log.info("GET /api/trainees/{}/trainings", username);
         List<TrainingResponse> trainings = trainingService.getTraineeTrainings(
-                authUser, authPass, from, to, trainerName, trainingType);
+                username, password, from, to, trainerName, trainingType);
         return ResponseEntity.ok(trainings);
     }
 }

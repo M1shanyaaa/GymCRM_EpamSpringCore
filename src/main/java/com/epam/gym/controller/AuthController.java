@@ -1,6 +1,7 @@
 package com.epam.gym.controller;
 
 import com.epam.gym.dto.request.ChangePasswordRequest;
+import com.epam.gym.security.NoAuth;
 import com.epam.gym.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -28,6 +29,7 @@ public class AuthController {
 
     // ---------- Endpoint 3: Login (GET) ----------
     @GetMapping("/login")
+    @NoAuth
     @Operation(summary = "User login",
             description = "Authenticates user using headers and returns 200 OK if credentials are correct.")
     @ApiResponses({
@@ -44,6 +46,7 @@ public class AuthController {
 
     // ---------- Endpoint 4: Change password ----------
     @PutMapping("/users/{username}/password")
+    @NoAuth
     @Operation(summary = "Change password",
             description = "Changes the user's password using the old password for verification.")
     @ApiResponses({
@@ -56,8 +59,7 @@ public class AuthController {
             @Parameter(description = "Target username") @PathVariable String username,
             @Valid @RequestBody ChangePasswordRequest request) {
         log.info("PUT /api/users/{}/password", username);
-        authService.changePassword(
-                request.username(), request.oldPassword(), request.newPassword());
+        authService.changePassword(username, request.oldPassword(), request.newPassword());
         return ResponseEntity.ok().build();
     }
 }
