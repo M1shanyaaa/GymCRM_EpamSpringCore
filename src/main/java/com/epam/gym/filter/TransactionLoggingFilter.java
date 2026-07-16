@@ -81,6 +81,11 @@ public class TransactionLoggingFilter implements Filter {
         if (buf == null || buf.length == 0) return "";
         // Limit log length to avoid massive JSONs taking up memory
         int length = Math.min(buf.length, 5000);
-        return new String(buf, 0, length, StandardCharsets.UTF_8).replaceAll("[\\r\\n]+", " ");
+        String payload = new String(buf, 0, length, StandardCharsets.UTF_8).replaceAll("[\\r\\n]+", " ");
+        return maskSensitiveData(payload);
+    }
+    private String maskSensitiveData(String payload) {
+        String regex = "(?i)(\"([^\"]*password[^\"]*)\"\\s*:\\s*\")([^\"]+)(\")";
+        return payload.replaceAll(regex, "$1****$4");
     }
 }
