@@ -68,8 +68,7 @@ class AuthControllerTest {
 
     @Test
     void changePassword_shouldReturn200_whenValid() throws Exception {
-        Map<String, String> body = Map.of(
-                "username", "John.Smith", "oldPassword", "raw", "newPassword", "newRaw");
+        Map<String, String> body = Map.of("oldPassword", "raw", "newPassword", "newRaw");
 
         mockMvc.perform(put("/api/users/John.Smith/password")
                         .contentType("application/json")
@@ -84,8 +83,7 @@ class AuthControllerTest {
         doThrow(new AuthenticationException("Invalid username or password"))
                 .when(authService).changePassword("John.Smith", "wrong", "newRaw");
 
-        Map<String, String> body = Map.of(
-                "username", "John.Smith", "oldPassword", "wrong", "newPassword", "newRaw");
+        Map<String, String> body = Map.of("oldPassword", "wrong", "newPassword", "newRaw");
 
         mockMvc.perform(put("/api/users/John.Smith/password")
                         .contentType("application/json")
@@ -98,8 +96,7 @@ class AuthControllerTest {
         doThrow(new EntityNotFoundException("User not found: Ghost"))
                 .when(authService).changePassword("Ghost", "raw", "newRaw");
 
-        Map<String, String> body = Map.of(
-                "username", "Ghost", "oldPassword", "raw", "newPassword", "newRaw");
+        Map<String, String> body = Map.of("oldPassword", "raw", "newPassword", "newRaw");
 
         mockMvc.perform(put("/api/users/Ghost/password")
                         .contentType("application/json")
@@ -109,8 +106,20 @@ class AuthControllerTest {
 
     @Test
     void changePassword_shouldReturn400_whenNewPasswordBlank() throws Exception {
+        Map<String, String> body = Map.of("oldPassword", "raw", "newPassword", "");
+
+        mockMvc.perform(put("/api/users/John.Smith/password")
+                        .contentType("application/json")
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(authService);
+    }
+
+    @Test
+    void changePassword_shouldReturn400_whenBodyContainsUnknownUsernameField() throws Exception {
         Map<String, String> body = Map.of(
-                "username", "John.Smith", "oldPassword", "raw", "newPassword", "");
+                "username", "John.Smith", "oldPassword", "raw", "newPassword", "newRaw");
 
         mockMvc.perform(put("/api/users/John.Smith/password")
                         .contentType("application/json")

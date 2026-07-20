@@ -31,6 +31,7 @@ public class TrainingController {
 
     // ---------- Endpoint 14: Add training ----------
     @PostMapping
+    @NoAuth
     @Operation(summary = "Add a new training session",
             description = "Creates a new training record associating a trainee and a trainer.")
     @ApiResponses({
