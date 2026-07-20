@@ -4,6 +4,10 @@ A simple in-memory Gym CRM system built with **Spring Core** (no Spring Boot).
 Manages trainees, trainers and trainings with profile creation, username/password
 generation
 
+# TODO: 
+replace long parameter lists in service methods (create/update)
+with request DTOs — planned for the REST module.
+
 ## Tech Stack
 
 - Java 17
