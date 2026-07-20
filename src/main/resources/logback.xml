@@ -18,10 +18,10 @@
         </encoder>
     </appender>
 
-    <!-- Наш код логуємо детальніше -->
+    <!-- detailed logs -->
     <logger name="com.epam.gym" level="DEBUG"/>
 
-    <!-- Spring не засмічує консоль -->
+    <!-- Spring dont mess up the console -->
     <logger name="org.springframework" level="WARN"/>
 
     <root level="INFO">

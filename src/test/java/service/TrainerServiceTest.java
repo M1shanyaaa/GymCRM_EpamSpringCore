@@ -1,132 +1,242 @@
 package service;
 
 import com.epam.gym.dao.TrainerDao;
+import com.epam.gym.dao.TrainingTypeDao;
+import com.epam.gym.exception.AuthenticationException;
+import com.epam.gym.exception.EntityNotFoundException;
 import com.epam.gym.model.Trainer;
+import com.epam.gym.model.TrainingType;
+import com.epam.gym.model.TrainingTypeName;
+import com.epam.gym.model.User;
+import com.epam.gym.service.AuthService;
 import com.epam.gym.service.TrainerService;
 import com.epam.gym.util.PasswordGenerator;
 import com.epam.gym.util.UsernameGenerator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class TrainerServiceTest {
 
-    @Mock
-    private TrainerDao trainerDao;
-
-    @Mock
-    private UsernameGenerator usernameGenerator;
-
-    @Mock
-    private PasswordGenerator passwordGenerator;
+    @Mock private TrainerDao trainerDao;
+    @Mock private TrainingTypeDao trainingTypeDao;
+    @Mock private UsernameGenerator usernameGenerator;
+    @Mock private PasswordGenerator passwordGenerator;
+    @Mock private PasswordEncoder passwordEncoder;
+    @Mock private AuthService authService;
 
     @InjectMocks
     private TrainerService trainerService;
 
-    @Test
-    void create_shouldGenerateUsernameAndPassword_andSave() {
-        Trainer input = Trainer.builder()
-                .firstName("Mike")
-                .lastName("Jordan")
+    private Trainer trainer;
+    private TrainingType strengthType;
+
+    @BeforeEach
+    void setUp() {
+        strengthType = new TrainingType(TrainingTypeName.STRENGTH);
+
+        User user = User.builder()
+                .firstName("Bruce")
+                .lastName("Wayne")
+                .username("Bruce.Wayne")
+                .password("hashed")
+                .isActive(true)
                 .build();
 
-        when(usernameGenerator.generate("Mike", "Jordan")).thenReturn("Mike.Jordan");
-        when(passwordGenerator.generate()).thenReturn("Pwd1234567");
+        trainer = Trainer.builder()
+                .user(user)
+                .specialization(strengthType)
+                .build();
+    }
+
+    // ---------- create ----------
+
+    @Test
+    void create_shouldResolveSpecializationGenerateCredentialsAndSave() {
+        when(trainingTypeDao.findByName(TrainingTypeName.STRENGTH))
+                .thenReturn(Optional.of(strengthType));
+        when(usernameGenerator.generate("Bruce", "Wayne")).thenReturn("Bruce.Wayne");
+        when(passwordGenerator.generate()).thenReturn("rawPass");
+        when(passwordEncoder.encode("rawPass")).thenReturn("hashed");
         when(trainerDao.save(any(Trainer.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        Trainer result = trainerService.create(input);
+        Trainer result = trainerService.create("Bruce", "Wayne", TrainingTypeName.STRENGTH);
 
-        assertThat(result.getUsername()).isEqualTo("Mike.Jordan");
-        assertThat(result.getPassword()).isEqualTo("Pwd1234567");
+        ArgumentCaptor<Trainer> captor = ArgumentCaptor.forClass(Trainer.class);
+        verify(trainerDao).save(captor.capture());
+        Trainer saved = captor.getValue();
 
-        verify(usernameGenerator).generate("Mike", "Jordan");
-        verify(passwordGenerator).generate();
-        verify(trainerDao).save(input);
+        assertThat(saved.getUser().getUsername()).isEqualTo("Bruce.Wayne");
+        assertThat(saved.getUser().getPassword()).isEqualTo("hashed");
+        assertThat(saved.getUser().isActive()).isTrue();
+        assertThat(saved.getSpecialization()).isEqualTo(strengthType);
+        assertThat(result).isNotNull();
     }
 
     @Test
-    void create_shouldThrow_whenTrainerIsNull() {
-        assertThatThrownBy(() -> trainerService.create(null))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("must not be null");
+    void create_shouldThrow_whenSpecializationNotFound() {
+        when(trainingTypeDao.findByName(TrainingTypeName.YOGA))
+                .thenReturn(Optional.empty());
 
-        verifyNoInteractions(trainerDao, usernameGenerator, passwordGenerator);
+        assertThatThrownBy(() ->
+                trainerService.create("Bruce", "Wayne", TrainingTypeName.YOGA))
+                .isInstanceOf(EntityNotFoundException.class);
+        verify(trainerDao, never()).save(any());
     }
 
     @Test
-    void create_shouldThrow_whenLastNameIsBlank() {
-        Trainer input = Trainer.builder().firstName("Mike").lastName("  ").build();
-
-        assertThatThrownBy(() -> trainerService.create(input))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("required");
-
+    void create_shouldThrow_whenFirstNameBlank() {
+        assertThatThrownBy(() ->
+                trainerService.create("", "Wayne", TrainingTypeName.STRENGTH))
+                .isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(trainerDao);
     }
 
     @Test
-    void update_shouldDelegateToDao() {
-        Trainer input = Trainer.builder().userId(1L).firstName("Mike").lastName("Jordan").build();
-        when(trainerDao.update(input)).thenReturn(input);
+    void create_shouldThrow_whenSpecializationNull() {
+        assertThatThrownBy(() ->
+                trainerService.create("Bruce", "Wayne", null))
+                .isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(trainerDao);
+    }
 
-        Trainer result = trainerService.update(input);
+    // ---------- findByUsername ----------
 
-        assertThat(result).isSameAs(input);
-        verify(trainerDao).update(input);
+    @Test
+    void findByUsername_shouldReturnTrainer_whenAuthenticated() {
+        when(trainerDao.findByUsername("Bruce.Wayne")).thenReturn(Optional.of(trainer));
+
+        Trainer result = trainerService.findByUsername("Bruce.Wayne", "raw");
+
+        assertThat(result).isSameAs(trainer);
+        verify(authService).authenticate("Bruce.Wayne", "raw");
     }
 
     @Test
-    void update_shouldThrow_whenIdIsNull() {
-        Trainer input = Trainer.builder().firstName("Mike").build();
+    void findByUsername_shouldThrow_whenNotFound() {
+        when(trainerDao.findByUsername("Ghost")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> trainerService.update(input))
+        assertThatThrownBy(() -> trainerService.findByUsername("Ghost", "raw"))
+                .isInstanceOf(EntityNotFoundException.class);
+    }
+
+    @Test
+    void findByUsername_shouldThrow_whenAuthFails() {
+        doThrow(new AuthenticationException("bad"))
+                .when(authService).authenticate("Bruce.Wayne", "wrong");
+
+        assertThatThrownBy(() -> trainerService.findByUsername("Bruce.Wayne", "wrong"))
+                .isInstanceOf(AuthenticationException.class);
+        verify(trainerDao, never()).findByUsername(anyString());
+    }
+
+    // ---------- changePassword ----------
+
+    @Test
+    void changePassword_shouldEncodeAndUpdate() {
+        when(trainerDao.findByUsername("Bruce.Wayne")).thenReturn(Optional.of(trainer));
+        when(passwordEncoder.encode("newPass")).thenReturn("newHashed");
+
+        trainerService.changePassword("Bruce.Wayne", "old", "newPass");
+
+        assertThat(trainer.getUser().getPassword()).isEqualTo("newHashed");
+        verify(authService).authenticate("Bruce.Wayne", "old");
+        verify(trainerDao).update(trainer);
+    }
+
+    @Test
+    void changePassword_shouldThrow_whenNewPasswordBlank() {
+        assertThatThrownBy(() ->
+                trainerService.changePassword("Bruce.Wayne", "old", ""))
                 .isInstanceOf(IllegalArgumentException.class);
-
         verify(trainerDao, never()).update(any());
     }
 
+    // ---------- update ----------
+
     @Test
-    void select_shouldReturnTrainer_whenFound() {
-        Trainer trainer = Trainer.builder().userId(1L).username("Mike.Jordan").build();
-        when(trainerDao.findById(1L)).thenReturn(Optional.of(trainer));
+    void update_shouldModifyFieldsAndSpecialization() {
+        TrainingType yoga = new TrainingType(TrainingTypeName.YOGA);
+        when(trainerDao.findByUsername("Bruce.Wayne")).thenReturn(Optional.of(trainer));
+        when(trainingTypeDao.findByName(TrainingTypeName.YOGA)).thenReturn(Optional.of(yoga));
+        when(trainerDao.update(any(Trainer.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        Trainer result = trainerService.select(1L);
+        Trainer result = trainerService.update("Bruce.Wayne", "raw",
+                "Bruce", "Banner", TrainingTypeName.YOGA);
 
-        assertThat(result).isEqualTo(trainer);
+        assertThat(result.getUser().getLastName()).isEqualTo("Banner");
+        assertThat(result.getSpecialization()).isEqualTo(yoga);
+        verify(authService).authenticate("Bruce.Wayne", "raw");
     }
 
     @Test
-    void select_shouldThrow_whenNotFound() {
-        when(trainerDao.findById(99L)).thenReturn(Optional.empty());
+    void update_shouldThrow_whenSpecializationNotFound() {
+        when(trainingTypeDao.findByName(TrainingTypeName.CARDIO)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> trainerService.select(99L))
-                .isInstanceOf(NoSuchElementException.class)
-                .hasMessageContaining("99");
+        assertThatThrownBy(() ->
+                trainerService.update("Bruce.Wayne", "raw", "Bruce", "Wayne", TrainingTypeName.CARDIO))
+                .isInstanceOf(EntityNotFoundException.class);
+    }
+
+    // ---------- toggleActive ----------
+
+    @Test
+    void toggleActive_shouldFlipStatus_activeToInactive() {
+        trainer.getUser().setActive(true);
+        when(trainerDao.findByUsername("Bruce.Wayne")).thenReturn(Optional.of(trainer));
+
+        trainerService.toggleActive("Bruce.Wayne", "raw");
+
+        assertThat(trainer.getUser().isActive()).isFalse();
+        verify(trainerDao).update(trainer);
     }
 
     @Test
-    void selectAll_shouldReturnAllTrainers() {
-        List<Trainer> trainers = List.of(
-                Trainer.builder().userId(1L).build(),
-                Trainer.builder().userId(2L).build()
-        );
-        when(trainerDao.findAll()).thenReturn(trainers);
+    void toggleActive_shouldFlipStatus_inactiveToActive() {
+        trainer.getUser().setActive(false);
+        when(trainerDao.findByUsername("Bruce.Wayne")).thenReturn(Optional.of(trainer));
 
-        List<Trainer> result = trainerService.selectAll();
+        trainerService.toggleActive("Bruce.Wayne", "raw");
 
-        assertThat(result).hasSize(2).containsExactlyElementsOf(trainers);
+        assertThat(trainer.getUser().isActive()).isTrue();
+    }
+
+    // ---------- findUnassignedTrainers ----------
+
+    @Test
+    void findUnassignedTrainers_shouldReturnList_whenAuthenticated() {
+        List<Trainer> unassigned = List.of(trainer);
+        when(trainerDao.findUnassignedTrainers("John.Smith")).thenReturn(unassigned);
+
+        List<Trainer> result = trainerService.findUnassignedTrainers("John.Smith", "raw");
+
+        assertThat(result).hasSize(1).containsExactly(trainer);
+        verify(authService).authenticate("John.Smith", "raw");
+    }
+
+    @Test
+    void findUnassignedTrainers_shouldThrow_whenAuthFails() {
+        doThrow(new AuthenticationException("bad"))
+                .when(authService).authenticate("John.Smith", "wrong");
+
+        assertThatThrownBy(() ->
+                trainerService.findUnassignedTrainers("John.Smith", "wrong"))
+                .isInstanceOf(AuthenticationException.class);
+        verify(trainerDao, never()).findUnassignedTrainers(anyString());
     }
 }

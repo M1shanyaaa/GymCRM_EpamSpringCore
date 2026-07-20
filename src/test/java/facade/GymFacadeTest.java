@@ -4,6 +4,7 @@ import com.epam.gym.facade.GymFacade;
 import com.epam.gym.model.Trainee;
 import com.epam.gym.model.Trainer;
 import com.epam.gym.model.Training;
+import com.epam.gym.model.TrainingTypeName;
 import com.epam.gym.service.TraineeService;
 import com.epam.gym.service.TrainerService;
 import com.epam.gym.service.TrainingService;
@@ -13,7 +14,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
@@ -21,124 +24,192 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class GymFacadeTest {
 
-    @Mock
-    private TraineeService traineeService;
-    @Mock
-    private TrainerService trainerService;
-    @Mock
-    private TrainingService trainingService;
+    @Mock private TraineeService traineeService;
+    @Mock private TrainerService trainerService;
+    @Mock private TrainingService trainingService;
 
-    @InjectMocks
-    private GymFacade facade;
+    @InjectMocks private GymFacade facade;
 
-    // ---- Trainee ----
+    // ===================== Trainee =====================
 
     @Test
-    void createTrainee_shouldDelegateToService() {
-        Trainee t = Trainee.builder().firstName("John").build();
-        when(traineeService.create(t)).thenReturn(t);
+    void createTrainee_shouldDelegateToTraineeService() {
+        Trainee expected = new Trainee();
+        LocalDate dob = LocalDate.of(1990, 1, 1);
+        when(traineeService.create("John", "Smith", dob, "Kyiv")).thenReturn(expected);
 
-        assertThat(facade.createTrainee(t)).isEqualTo(t);
-        verify(traineeService).create(t);
+        Trainee result = facade.createTrainee("John", "Smith", dob, "Kyiv");
+
+        assertThat(result).isSameAs(expected);
+        verify(traineeService).create("John", "Smith", dob, "Kyiv");
     }
 
     @Test
-    void updateTrainee_shouldDelegateToService() {
-        Trainee t = Trainee.builder().userId(1L).build();
-        when(traineeService.update(t)).thenReturn(t);
+    void getTrainee_shouldDelegate() {
+        Trainee expected = new Trainee();
+        when(traineeService.findByUsername("John.Smith", "pass")).thenReturn(expected);
 
-        assertThat(facade.updateTrainee(t)).isEqualTo(t);
-        verify(traineeService).update(t);
+        Trainee result = facade.getTrainee("John.Smith", "pass");
+
+        assertThat(result).isSameAs(expected);
+        verify(traineeService).findByUsername("John.Smith", "pass");
     }
 
     @Test
-    void deleteTrainee_shouldDelegateToService() {
-        facade.deleteTrainee(1L);
-        verify(traineeService).delete(1L);
+    void updateTrainee_shouldDelegate() {
+        Trainee expected = new Trainee();
+        LocalDate dob = LocalDate.of(1990, 1, 1);
+        when(traineeService.update("John.Smith", "pass", "John", "Smith", dob, "Kyiv"))
+                .thenReturn(expected);
+
+        Trainee result = facade.updateTrainee(
+                "John.Smith", "pass", "John", "Smith", dob, "Kyiv");
+
+        assertThat(result).isSameAs(expected);
+        verify(traineeService).update("John.Smith", "pass", "John", "Smith", dob, "Kyiv");
     }
 
     @Test
-    void getTrainee_shouldDelegateToService() {
-        Trainee t = Trainee.builder().userId(1L).build();
-        when(traineeService.select(1L)).thenReturn(t);
-
-        assertThat(facade.getTrainee(1L)).isEqualTo(t);
-        verify(traineeService).select(1L);
+    void changeTraineePassword_shouldDelegate() {
+        facade.changeTraineePassword("John.Smith", "old", "new");
+        verify(traineeService).changePassword("John.Smith", "old", "new");
     }
 
     @Test
-    void getAllTrainees_shouldDelegateToService() {
-        List<Trainee> list = List.of(Trainee.builder().build());
-        when(traineeService.selectAll()).thenReturn(list);
-
-        assertThat(facade.getAllTrainees()).isEqualTo(list);
-        verify(traineeService).selectAll();
-    }
-
-    // ---- Trainer ----
-
-    @Test
-    void createTrainer_shouldDelegateToService() {
-        Trainer t = Trainer.builder().firstName("Mike").build();
-        when(trainerService.create(t)).thenReturn(t);
-
-        assertThat(facade.createTrainer(t)).isEqualTo(t);
-        verify(trainerService).create(t);
+    void toggleTraineeActive_shouldDelegate() {
+        facade.toggleTraineeActive("John.Smith", "pass");
+        verify(traineeService).toggleActive("John.Smith", "pass");
     }
 
     @Test
-    void updateTrainer_shouldDelegateToService() {
-        Trainer t = Trainer.builder().userId(1L).build();
-        when(trainerService.update(t)).thenReturn(t);
+    void deleteTrainee_shouldDelegate() {
+        facade.deleteTrainee("John.Smith", "pass");
+        verify(traineeService).delete("John.Smith", "pass");
+    }
 
-        assertThat(facade.updateTrainer(t)).isEqualTo(t);
-        verify(trainerService).update(t);
+    // ===================== Trainer =====================
+
+    @Test
+    void createTrainer_shouldDelegate() {
+        Trainer expected = new Trainer();
+        when(trainerService.create("Bruce", "Wayne", TrainingTypeName.STRENGTH))
+                .thenReturn(expected);
+
+        Trainer result = facade.createTrainer("Bruce", "Wayne", TrainingTypeName.STRENGTH);
+
+        assertThat(result).isSameAs(expected);
+        verify(trainerService).create("Bruce", "Wayne", TrainingTypeName.STRENGTH);
     }
 
     @Test
-    void getTrainer_shouldDelegateToService() {
-        Trainer t = Trainer.builder().userId(1L).build();
-        when(trainerService.select(1L)).thenReturn(t);
+    void getTrainer_shouldDelegate() {
+        Trainer expected = new Trainer();
+        when(trainerService.findByUsername("Bruce.Wayne", "pass")).thenReturn(expected);
 
-        assertThat(facade.getTrainer(1L)).isEqualTo(t);
-        verify(trainerService).select(1L);
+        Trainer result = facade.getTrainer("Bruce.Wayne", "pass");
+
+        assertThat(result).isSameAs(expected);
+        verify(trainerService).findByUsername("Bruce.Wayne", "pass");
     }
 
     @Test
-    void getAllTrainers_shouldDelegateToService() {
-        List<Trainer> list = List.of(Trainer.builder().build());
-        when(trainerService.selectAll()).thenReturn(list);
+    void updateTrainer_shouldDelegate() {
+        Trainer expected = new Trainer();
+        when(trainerService.update("Bruce.Wayne", "pass", "Bruce", "Wayne", TrainingTypeName.CARDIO))
+                .thenReturn(expected);
 
-        assertThat(facade.getAllTrainers()).isEqualTo(list);
-        verify(trainerService).selectAll();
-    }
+        Trainer result = facade.updateTrainer(
+                "Bruce.Wayne", "pass", "Bruce", "Wayne", TrainingTypeName.CARDIO);
 
-    // ---- Training ----
-
-    @Test
-    void createTraining_shouldDelegateToService() {
-        Training t = Training.builder().traineeId(1L).trainerId(2L).build();
-        when(trainingService.create(t)).thenReturn(t);
-
-        assertThat(facade.createTraining(t)).isEqualTo(t);
-        verify(trainingService).create(t);
+        assertThat(result).isSameAs(expected);
+        verify(trainerService).update("Bruce.Wayne", "pass", "Bruce", "Wayne", TrainingTypeName.CARDIO);
     }
 
     @Test
-    void getTraining_shouldDelegateToService() {
-        Training t = Training.builder().traineeId(1L).build();
-        when(trainingService.select(1L)).thenReturn(t);
-
-        assertThat(facade.getTraining(1L)).isEqualTo(t);
-        verify(trainingService).select(1L);
+    void changeTrainerPassword_shouldDelegate() {
+        facade.changeTrainerPassword("Bruce.Wayne", "old", "new");
+        verify(trainerService).changePassword("Bruce.Wayne", "old", "new");
     }
 
     @Test
-    void getAllTrainings_shouldDelegateToService() {
-        List<Training> list = List.of(Training.builder().build());
-        when(trainingService.selectAll()).thenReturn(list);
+    void toggleTrainerActive_shouldDelegate() {
+        facade.toggleTrainerActive("Bruce.Wayne", "pass");
+        verify(trainerService).toggleActive("Bruce.Wayne", "pass");
+    }
 
-        assertThat(facade.getAllTrainings()).isEqualTo(list);
-        verify(trainingService).selectAll();
+    @Test
+    void getUnassignedTrainers_shouldDelegate() {
+        List<Trainer> expected = List.of(new Trainer());
+        when(trainerService.findUnassignedTrainers("John.Smith", "pass")).thenReturn(expected);
+
+        List<Trainer> result = facade.getUnassignedTrainers("John.Smith", "pass");
+
+        assertThat(result).isSameAs(expected);
+        verify(trainerService).findUnassignedTrainers("John.Smith", "pass");
+    }
+
+    // ===================== Training =====================
+
+    @Test
+    void addTraining_shouldDelegate() {
+        Training expected = new Training();
+        LocalDate date = LocalDate.of(2024, 6, 1);
+        when(trainingService.addTraining(
+                "caller", "cpass", "John.Smith", "Bruce.Wayne", "Session", date, 45))
+                .thenReturn(expected);
+
+        Training result = facade.addTraining(
+                "caller", "cpass", "John.Smith", "Bruce.Wayne", "Session", date, 45);
+
+        assertThat(result).isSameAs(expected);
+        verify(trainingService).addTraining(
+                "caller", "cpass", "John.Smith", "Bruce.Wayne", "Session", date, 45);
+    }
+
+    @Test
+    void getTraineeTrainings_shouldDelegate() {
+        List<Training> expected = List.of(new Training());
+        LocalDate from = LocalDate.of(2024, 1, 1);
+        LocalDate to = LocalDate.of(2024, 12, 31);
+        when(trainingService.getTraineeTrainings(
+                "John.Smith", "pass", from, to, "Bruce", TrainingTypeName.STRENGTH))
+                .thenReturn(expected);
+
+        List<Training> result = facade.getTraineeTrainings(
+                "John.Smith", "pass", from, to, "Bruce", TrainingTypeName.STRENGTH);
+
+        assertThat(result).isSameAs(expected);
+        verify(trainingService).getTraineeTrainings(
+                "John.Smith", "pass", from, to, "Bruce", TrainingTypeName.STRENGTH);
+    }
+
+    @Test
+    void getTrainerTrainings_shouldDelegate() {
+        List<Training> expected = List.of(new Training());
+        LocalDate from = LocalDate.of(2024, 1, 1);
+        LocalDate to = LocalDate.of(2024, 12, 31);
+        when(trainingService.getTrainerTrainings(
+                "Bruce.Wayne", "pass", from, to, "John"))
+                .thenReturn(expected);
+
+        List<Training> result = facade.getTrainerTrainings(
+                "Bruce.Wayne", "pass", from, to, "John");
+
+        assertThat(result).isSameAs(expected);
+        verify(trainingService).getTrainerTrainings(
+                "Bruce.Wayne", "pass", from, to, "John");
+    }
+
+    @Test
+    void updateTraineeTrainers_shouldDelegate() {
+        Set<Trainer> expected = Set.of(new Trainer());
+        List<String> usernames = List.of("Bruce.Wayne", "Clark.Kent");
+        when(trainingService.updateTraineeTrainers("John.Smith", "pass", usernames))
+                .thenReturn(expected);
+
+        Set<Trainer> result = facade.updateTraineeTrainers("John.Smith", "pass", usernames);
+
+        assertThat(result).isSameAs(expected);
+        verify(trainingService).updateTraineeTrainers("John.Smith", "pass", usernames);
     }
 }

@@ -1,16 +1,24 @@
 package com.epam.gym.model;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
+import jakarta.persistence.*;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/**
- * Represents a training type entity.
- */
-@Data
+@Entity
+@Table(name = "training_types")
+@Getter
 @NoArgsConstructor
-@AllArgsConstructor
 public class TrainingType {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "training_type_name", nullable = false, unique = true)
     private TrainingTypeName trainingTypeName;
+
+    public TrainingType(TrainingTypeName trainingTypeName) {
+        this.trainingTypeName = trainingTypeName;
+    }
 }

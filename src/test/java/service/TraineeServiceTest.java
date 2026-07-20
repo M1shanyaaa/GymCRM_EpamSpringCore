@@ -1,154 +1,216 @@
 package service;
 
 import com.epam.gym.dao.TraineeDao;
+import com.epam.gym.exception.AuthenticationException;
+import com.epam.gym.exception.EntityNotFoundException;
 import com.epam.gym.model.Trainee;
+import com.epam.gym.model.User;
+import com.epam.gym.service.AuthService;
 import com.epam.gym.service.TraineeService;
 import com.epam.gym.util.PasswordGenerator;
 import com.epam.gym.util.UsernameGenerator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.util.List;
-import java.util.NoSuchElementException;
+import java.time.LocalDate;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class TraineeServiceTest {
 
-    @Mock
-    private TraineeDao traineeDao;
-
-    @Mock
-    private UsernameGenerator usernameGenerator;
-
-    @Mock
-    private PasswordGenerator passwordGenerator;
-
-    @Mock
-    private PasswordEncoder passwordEncoder;
+    @Mock private TraineeDao traineeDao;
+    @Mock private UsernameGenerator usernameGenerator;
+    @Mock private PasswordGenerator passwordGenerator;
+    @Mock private PasswordEncoder passwordEncoder;
+    @Mock private AuthService authService;
 
     @InjectMocks
     private TraineeService traineeService;
 
+    private Trainee trainee;
 
-    @Test
-    void create_shouldGenerateUsernameAndHashedPassword_andSave() {
-        Trainee input = Trainee.builder()
+    @BeforeEach
+    void setUp() {
+        User user = User.builder()
                 .firstName("John")
                 .lastName("Smith")
+                .username("John.Smith")
+                .password("hashed")
+                .isActive(true)
                 .build();
 
+        trainee = Trainee.builder()
+                .user(user)
+                .dateOfBirth(LocalDate.of(1990, 1, 1))
+                .address("Kyiv")
+                .build();
+    }
+
+    // ---------- create ----------
+
+    @Test
+    void create_shouldGenerateUsernameHashPasswordAndSave() {
         when(usernameGenerator.generate("John", "Smith")).thenReturn("John.Smith");
-        when(passwordGenerator.generate()).thenReturn("Abc1234xyz");
-        when(passwordEncoder.encode("Abc1234xyz")).thenReturn("$2a$10$hashed");
+        when(passwordGenerator.generate()).thenReturn("rawPass");
+        when(passwordEncoder.encode("rawPass")).thenReturn("hashed");
         when(traineeDao.save(any(Trainee.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        Trainee result = traineeService.create(input);
+        Trainee result = traineeService.create("John", "Smith",
+                LocalDate.of(1990, 1, 1), "Kyiv");
 
-        assertThat(result.getUsername()).isEqualTo("John.Smith");
-        assertThat(result.getPassword()).isEqualTo("$2a$10$hashed");
+        ArgumentCaptor<Trainee> captor = ArgumentCaptor.forClass(Trainee.class);
+        verify(traineeDao).save(captor.capture());
+        Trainee saved = captor.getValue();
 
-        verify(usernameGenerator).generate("John", "Smith");
-        verify(passwordGenerator).generate();
-        verify(passwordEncoder).encode("Abc1234xyz");
-        verify(traineeDao).save(input);
+        assertThat(saved.getUser().getUsername()).isEqualTo("John.Smith");
+        assertThat(saved.getUser().getPassword()).isEqualTo("hashed");
+        assertThat(saved.getUser().isActive()).isTrue();
+        assertThat(saved.getAddress()).isEqualTo("Kyiv");
+        assertThat(result).isNotNull();
     }
 
     @Test
-    void create_shouldThrow_whenTraineeIsNull() {
-        assertThatThrownBy(() -> traineeService.create(null))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("must not be null");
-
-        verifyNoInteractions(traineeDao, usernameGenerator, passwordGenerator);
-    }
-
-    @Test
-    void create_shouldThrow_whenFirstNameIsBlank() {
-        Trainee input = Trainee.builder().firstName("  ").lastName("Smith").build();
-
-        assertThatThrownBy(() -> traineeService.create(input))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("required");
-
+    void create_shouldThrow_whenFirstNameBlank() {
+        assertThatThrownBy(() -> traineeService.create("", "Smith", null, null))
+                .isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(traineeDao);
     }
 
     @Test
-    void update_shouldDelegateToDao() {
-        Trainee input = Trainee.builder().userId(1L).firstName("John").lastName("Smith").build();
-        when(traineeDao.update(input)).thenReturn(input);
+    void create_shouldThrow_whenLastNameBlank() {
+        assertThatThrownBy(() -> traineeService.create("John", " ", null, null))
+                .isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(traineeDao);
+    }
 
-        Trainee result = traineeService.update(input);
+    // ---------- findByUsername ----------
 
-        assertThat(result).isSameAs(input);
-        verify(traineeDao).update(input);
+    @Test
+    void findByUsername_shouldReturnTrainee_whenAuthenticated() {
+        when(traineeDao.findByUsername("John.Smith")).thenReturn(Optional.of(trainee));
+
+        Trainee result = traineeService.findByUsername("John.Smith", "raw");
+
+        assertThat(result).isSameAs(trainee);
+        verify(authService).authenticate("John.Smith", "raw");
     }
 
     @Test
-    void update_shouldThrow_whenIdIsNull() {
-        Trainee input = Trainee.builder().firstName("John").build();
+    void findByUsername_shouldThrow_whenNotFound() {
+        when(traineeDao.findByUsername("Ghost")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> traineeService.update(input))
+        assertThatThrownBy(() -> traineeService.findByUsername("Ghost", "raw"))
+                .isInstanceOf(EntityNotFoundException.class);
+    }
+
+    @Test
+    void findByUsername_shouldThrow_whenAuthFails() {
+        doThrow(new AuthenticationException("bad"))
+                .when(authService).authenticate("John.Smith", "wrong");
+
+        assertThatThrownBy(() -> traineeService.findByUsername("John.Smith", "wrong"))
+                .isInstanceOf(AuthenticationException.class);
+        verify(traineeDao, never()).findByUsername(anyString());
+    }
+
+    // ---------- changePassword ----------
+
+    @Test
+    void changePassword_shouldEncodeAndUpdate() {
+        when(traineeDao.findByUsername("John.Smith")).thenReturn(Optional.of(trainee));
+        when(passwordEncoder.encode("newPass")).thenReturn("newHashed");
+
+        traineeService.changePassword("John.Smith", "old", "newPass");
+
+        assertThat(trainee.getUser().getPassword()).isEqualTo("newHashed");
+        verify(authService).authenticate("John.Smith", "old");
+        verify(traineeDao).update(trainee);
+    }
+
+    @Test
+    void changePassword_shouldThrow_whenNewPasswordBlank() {
+        assertThatThrownBy(() ->
+                traineeService.changePassword("John.Smith", "old", " "))
                 .isInstanceOf(IllegalArgumentException.class);
-
         verify(traineeDao, never()).update(any());
     }
 
-    @Test
-    void delete_shouldDelegateToDao() {
-        traineeService.delete(1L);
+    // ---------- update ----------
 
-        verify(traineeDao).deleteById(1L);
+    @Test
+    void update_shouldModifyFieldsAndSave() {
+        when(traineeDao.findByUsername("John.Smith")).thenReturn(Optional.of(trainee));
+        when(traineeDao.update(any(Trainee.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Trainee result = traineeService.update("John.Smith", "raw",
+                "Johnny", "Smithson", LocalDate.of(1985, 5, 5), "Lviv");
+
+        assertThat(result.getUser().getFirstName()).isEqualTo("Johnny");
+        assertThat(result.getUser().getLastName()).isEqualTo("Smithson");
+        assertThat(result.getAddress()).isEqualTo("Lviv");
+        verify(authService).authenticate("John.Smith", "raw");
     }
 
     @Test
-    void delete_shouldThrow_whenIdIsNull() {
-        assertThatThrownBy(() -> traineeService.delete(null))
+    void update_shouldThrow_whenNamesBlank() {
+        assertThatThrownBy(() ->
+                traineeService.update("John.Smith", "raw", "", "", null, null))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
 
-        verify(traineeDao, never()).deleteById(any());
+    // ---------- toggleActive ----------
+
+    @Test
+    void toggleActive_shouldFlipStatus_fromActiveToInactive() {
+        trainee.getUser().setActive(true);
+        when(traineeDao.findByUsername("John.Smith")).thenReturn(Optional.of(trainee));
+
+        traineeService.toggleActive("John.Smith", "raw");
+
+        assertThat(trainee.getUser().isActive()).isFalse();
+        verify(traineeDao).update(trainee);
     }
 
     @Test
-    void select_shouldReturnTrainee_whenFound() {
-        Trainee trainee = Trainee.builder().userId(1L).username("John.Smith").build();
-        when(traineeDao.findById(1L)).thenReturn(Optional.of(trainee));
+    void toggleActive_shouldFlipStatus_fromInactiveToActive() {
+        trainee.getUser().setActive(false);
+        when(traineeDao.findByUsername("John.Smith")).thenReturn(Optional.of(trainee));
 
-        Trainee result = traineeService.select(1L);
+        traineeService.toggleActive("John.Smith", "raw");
 
-        assertThat(result).isEqualTo(trainee);
+        assertThat(trainee.getUser().isActive()).isTrue();
+    }
+
+    // ---------- delete ----------
+
+    @Test
+    void delete_shouldRemoveTrainee_whenAuthenticated() {
+        when(traineeDao.findByUsername("John.Smith")).thenReturn(Optional.of(trainee));
+
+        traineeService.delete("John.Smith", "raw");
+
+        verify(authService).authenticate("John.Smith", "raw");
+        verify(traineeDao).delete(trainee);
     }
 
     @Test
-    void select_shouldThrow_whenNotFound() {
-        when(traineeDao.findById(99L)).thenReturn(Optional.empty());
+    void delete_shouldThrow_whenNotFound() {
+        when(traineeDao.findByUsername("Ghost")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> traineeService.select(99L))
-                .isInstanceOf(NoSuchElementException.class)
-                .hasMessageContaining("99");
-    }
-
-    @Test
-    void selectAll_shouldReturnAllTrainees() {
-        List<Trainee> trainees = List.of(
-                Trainee.builder().userId(1L).build(),
-                Trainee.builder().userId(2L).build()
-        );
-        when(traineeDao.findAll()).thenReturn(trainees);
-
-        List<Trainee> result = traineeService.selectAll();
-
-        assertThat(result).hasSize(2).containsExactlyElementsOf(trainees);
+        assertThatThrownBy(() -> traineeService.delete("Ghost", "raw"))
+                .isInstanceOf(EntityNotFoundException.class);
+        verify(traineeDao, never()).delete(any());
     }
 }
