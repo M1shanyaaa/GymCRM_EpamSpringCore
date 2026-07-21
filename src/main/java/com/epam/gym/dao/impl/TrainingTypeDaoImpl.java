@@ -13,6 +13,8 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 
+import jakarta.persistence.EntityManagerFactory;
+
 @Repository
 public class TrainingTypeDaoImpl implements TrainingTypeDao {
 
@@ -21,8 +23,8 @@ public class TrainingTypeDaoImpl implements TrainingTypeDao {
     private final SessionFactory sessionFactory;
 
     @Autowired
-    public TrainingTypeDaoImpl(SessionFactory sessionFactory) {
-        this.sessionFactory = sessionFactory;
+    public TrainingTypeDaoImpl(EntityManagerFactory emf) {
+        this.sessionFactory = emf.unwrap(SessionFactory.class);
     }
 
     @Override

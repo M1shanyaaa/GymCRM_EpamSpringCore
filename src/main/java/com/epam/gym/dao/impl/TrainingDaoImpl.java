@@ -3,6 +3,7 @@ package com.epam.gym.dao.impl;
 import com.epam.gym.dao.TrainingDao;
 import com.epam.gym.model.*;
 
+import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.criteria.*;
 
 import org.hibernate.Session;
@@ -25,8 +26,8 @@ public class TrainingDaoImpl implements TrainingDao {
     private final SessionFactory sessionFactory;
 
     @Autowired
-    public TrainingDaoImpl(SessionFactory sessionFactory) {
-        this.sessionFactory = sessionFactory;
+    public TrainingDaoImpl(EntityManagerFactory emf) {
+        this.sessionFactory = emf.unwrap(SessionFactory.class);
     }
 
     // ---------- Add training (Function 16) ----------

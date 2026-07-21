@@ -11,6 +11,8 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
+import jakarta.persistence.EntityManagerFactory;
+
 @Repository
 public class TraineeDaoImpl implements TraineeDao {
 
@@ -19,8 +21,8 @@ public class TraineeDaoImpl implements TraineeDao {
     private final SessionFactory sessionFactory;
 
     @Autowired
-    public TraineeDaoImpl(SessionFactory sessionFactory) {
-        this.sessionFactory = sessionFactory;
+    public TraineeDaoImpl(EntityManagerFactory emf) {
+        this.sessionFactory = emf.unwrap(SessionFactory.class);
     }
 
     @Override

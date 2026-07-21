@@ -11,6 +11,8 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
+import jakarta.persistence.EntityManagerFactory;
+
 @Repository
 public class UserDaoImpl implements UserDao {
 
@@ -19,8 +21,8 @@ public class UserDaoImpl implements UserDao {
     private final SessionFactory sessionFactory;
 
     @Autowired
-    public UserDaoImpl(SessionFactory sessionFactory) {
-        this.sessionFactory = sessionFactory;
+    public UserDaoImpl(EntityManagerFactory emf) {
+        this.sessionFactory = emf.unwrap(SessionFactory.class);
     }
 
     @Override
