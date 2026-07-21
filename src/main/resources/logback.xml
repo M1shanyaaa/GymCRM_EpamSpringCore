@@ -4,7 +4,9 @@
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
             <!-- Added [TxId: %X{transactionId}] to display the MDC context -->
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [TxId: %X{transactionId}] %logger{36} - %msg%n</pattern>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [TxId: %X{transactionId}]
+                %logger{36} - %msg%n
+            </pattern>
         </encoder>
     </appender>
 
@@ -16,7 +18,9 @@
         </rollingPolicy>
         <encoder>
             <!-- Added [TxId: %X{transactionId}] to display the MDC context -->
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [TxId: %X{transactionId}] %logger{36} - %msg%n</pattern>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [TxId: %X{transactionId}]
+                %logger{36} - %msg%n
+            </pattern>
         </encoder>
     </appender>
 

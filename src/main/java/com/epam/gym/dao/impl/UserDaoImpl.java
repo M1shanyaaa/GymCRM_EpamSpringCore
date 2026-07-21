@@ -2,6 +2,7 @@ package com.epam.gym.dao.impl;
 
 import com.epam.gym.dao.UserDao;
 import com.epam.gym.model.User;
+
 import org.hibernate.SessionFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

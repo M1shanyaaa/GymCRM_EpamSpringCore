@@ -4,6 +4,7 @@ import com.epam.gym.dto.response.TrainingResponse;
 import com.epam.gym.dto.response.TrainingTypeResponse;
 import com.epam.gym.model.Training;
 import com.epam.gym.model.TrainingType;
+
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 

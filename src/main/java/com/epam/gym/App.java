@@ -2,7 +2,9 @@ package com.epam.gym;
 
 import com.epam.gym.config.AppConfig;
 import com.epam.gym.filter.TransactionLoggingFilter;
+
 import jakarta.servlet.ServletException;
+
 import org.apache.catalina.Context;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.startup.Tomcat;

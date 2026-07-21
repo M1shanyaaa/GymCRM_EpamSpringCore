@@ -13,6 +13,7 @@ import com.epam.gym.model.TrainingTypeName;
 import com.epam.gym.model.User;
 import com.epam.gym.util.PasswordGenerator;
 import com.epam.gym.util.UsernameGenerator;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;

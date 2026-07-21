@@ -2,7 +2,9 @@ package com.epam.gym.dao.impl;
 
 import com.epam.gym.dao.TrainingDao;
 import com.epam.gym.model.*;
+
 import jakarta.persistence.criteria.*;
+
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;

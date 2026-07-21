@@ -3,6 +3,7 @@ package com.epam.gym.dao.impl;
 import com.epam.gym.dao.TrainingTypeDao;
 import com.epam.gym.model.TrainingType;
 import com.epam.gym.model.TrainingTypeName;
+
 import org.hibernate.SessionFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

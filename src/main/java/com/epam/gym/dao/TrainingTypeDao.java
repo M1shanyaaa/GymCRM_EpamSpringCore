@@ -8,6 +8,8 @@ import java.util.Optional;
 
 public interface TrainingTypeDao {
     Optional<TrainingType> findByName(TrainingTypeName name);
+
     List<TrainingType> findAll();
+
     TrainingType save(TrainingType trainingType);
 }

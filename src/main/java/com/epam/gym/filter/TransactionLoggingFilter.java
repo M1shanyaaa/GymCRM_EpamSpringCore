@@ -3,6 +3,7 @@ package com.epam.gym.filter;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -84,6 +85,7 @@ public class TransactionLoggingFilter implements Filter {
         String payload = new String(buf, 0, length, StandardCharsets.UTF_8).replaceAll("[\\r\\n]+", " ");
         return maskSensitiveData(payload);
     }
+
     private String maskSensitiveData(String payload) {
         String regex = "(?i)(\"([^\"]*password[^\"]*)\"\\s*:\\s*\")([^\"]+)(\")";
         return payload.replaceAll(regex, "$1****$4");

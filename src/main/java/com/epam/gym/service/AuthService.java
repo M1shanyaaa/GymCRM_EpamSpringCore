@@ -4,6 +4,7 @@ import com.epam.gym.dao.UserDao;
 import com.epam.gym.exception.AuthenticationException;
 import com.epam.gym.exception.EntityNotFoundException;
 import com.epam.gym.model.User;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
