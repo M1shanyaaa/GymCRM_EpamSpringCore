@@ -4,6 +4,7 @@ import com.epam.gym.controller.TraineeController;
 import com.epam.gym.dto.response.*;
 import com.epam.gym.exception.EntityNotFoundException;
 import com.epam.gym.exception.GlobalExceptionHandler;
+import com.epam.gym.filter.TransactionLoggingFilter;
 import com.epam.gym.model.TrainingTypeName;
 import com.epam.gym.service.TraineeService;
 import com.epam.gym.service.TrainingService;
@@ -50,6 +51,7 @@ class TraineeControllerTest {
                 .standaloneSetup(traineeController)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .addFilters(new TransactionLoggingFilter())
                 .build();
     }
 
