@@ -3,6 +3,7 @@ package com.epam.gym.filter;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -17,6 +18,7 @@ public class TransactionLoggingFilter implements Filter {
 
     private static final Logger log = LoggerFactory.getLogger(TransactionLoggingFilter.class);
     private static final String TRANSACTION_ID_KEY = "transactionId";
+    private static final int MAX_PAYLOAD_LENGTH = 5000;
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
@@ -79,11 +81,17 @@ public class TransactionLoggingFilter implements Filter {
 
     private String getPayload(byte[] buf) {
         if (buf == null || buf.length == 0) return "";
-        // Limit log length to avoid massive JSONs taking up memory
-        int length = Math.min(buf.length, 5000);
-        String payload = new String(buf, 0, length, StandardCharsets.UTF_8).replaceAll("[\\r\\n]+", " ");
+        // Decode the FULL byte array first. Cutting raw bytes at an arbitrary
+        // offset can split a multi-byte UTF-8 character in half, producing
+        // garbled/replacement characters at the truncation boundary.
+        String full = new String(buf, StandardCharsets.UTF_8);
+        String truncated = full.length() > MAX_PAYLOAD_LENGTH
+                ? full.substring(0, MAX_PAYLOAD_LENGTH)
+                : full;
+        String payload = truncated.replaceAll("[\\r\\n]+", " ");
         return maskSensitiveData(payload);
     }
+
     private String maskSensitiveData(String payload) {
         String regex = "(?i)(\"([^\"]*password[^\"]*)\"\\s*:\\s*\")([^\"]+)(\")";
         return payload.replaceAll(regex, "$1****$4");
