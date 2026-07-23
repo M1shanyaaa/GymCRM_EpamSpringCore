@@ -6,6 +6,7 @@ import com.epam.gym.dto.response.TrainingTypeResponse;
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -19,6 +20,7 @@ public class TrainingTypesHealthIndicator implements HealthIndicator {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Health health() {
         try {
             List<TrainingTypeResponse> types = trainingService.getTrainingTypes();

@@ -5,6 +5,7 @@ import com.epam.gym.model.User;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+
 import org.hibernate.Session;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,5 +48,15 @@ public class UserDaoImpl implements UserDao {
         User merged = entityManager.unwrap(Session.class).merge(user);
         log.debug("update(user id={}) -> success", user.getId());
         return merged;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long countAll() {
+        Long count = entityManager.unwrap(Session.class)
+                .createQuery("SELECT COUNT(u) FROM User u", Long.class)
+                .uniqueResult();
+        log.debug("countAll() -> {}", count);
+        return count != null ? count : 0L;
     }
 }
