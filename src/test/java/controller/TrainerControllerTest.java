@@ -2,10 +2,13 @@ package controller;
 
 import com.epam.gym.controller.TrainerController;
 import com.epam.gym.dto.response.*;
+import com.epam.gym.exception.AuthenticationException;
 import com.epam.gym.exception.EntityNotFoundException;
 import com.epam.gym.exception.GlobalExceptionHandler;
 import com.epam.gym.filter.TransactionLoggingFilter;
 import com.epam.gym.model.TrainingTypeName;
+import com.epam.gym.security.AuthenticationInterceptor;
+import com.epam.gym.service.AuthService;
 import com.epam.gym.service.TrainerService;
 import com.epam.gym.service.TrainingService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -34,6 +37,7 @@ class TrainerControllerTest {
 
     @Mock private TrainerService trainerService;
     @Mock private TrainingService trainingService;
+    @Mock private AuthService authService;
 
     @InjectMocks private TrainerController trainerController;
 
@@ -51,6 +55,7 @@ class TrainerControllerTest {
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .addFilters(new TransactionLoggingFilter())
+                .addInterceptors(new AuthenticationInterceptor(authService))
                 .build();
     }
 
@@ -94,11 +99,12 @@ class TrainerControllerTest {
                         "Bruce", "Wayne", TrainingTypeName.STRENGTH, true, List.of()));
 
         mockMvc.perform(get("/api/trainers/Bruce.Wayne")
-                        .header("X-Auth-Username", "Bruce.Wayne")
                         .header("X-Auth-Password", "raw"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.firstName").value("Bruce"))
                 .andExpect(jsonPath("$.specialization").value("STRENGTH"));
+
+        verify(authService).authenticate("Bruce.Wayne", "raw");
     }
 
     @Test
@@ -107,10 +113,31 @@ class TrainerControllerTest {
                 .thenThrow(new EntityNotFoundException("Trainer not found: Ghost"));
 
         mockMvc.perform(get("/api/trainers/Ghost")
-                        .header("X-Auth-Username", "Ghost")
                         .header("X-Auth-Password", "raw"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404));
+    }
+
+    @Test
+    void getProfile_shouldReturn401_whenPasswordHeaderMissing() throws Exception {
+        // no X-Auth-Password header — AuthenticationInterceptor rejects it
+        // before the request reaches the controller.
+        mockMvc.perform(get("/api/trainers/Bruce.Wayne"))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(trainerService);
+    }
+
+    @Test
+    void getProfile_shouldReturn401_whenPasswordWrong() throws Exception {
+        doThrow(new AuthenticationException("Invalid credentials"))
+                .when(authService).authenticate("Bruce.Wayne", "wrong");
+
+        mockMvc.perform(get("/api/trainers/Bruce.Wayne")
+                        .header("X-Auth-Password", "wrong"))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(trainerService);
     }
 
     @Test
@@ -126,7 +153,6 @@ class TrainerControllerTest {
                 "isActive", false);
 
         mockMvc.perform(put("/api/trainers/Bruce.Wayne")
-                        .header("X-Auth-Username", "Bruce.Wayne")
                         .header("X-Auth-Password", "raw")
                         .contentType("application/json")
                         .content(objectMapper.writeValueAsString(body)))
@@ -140,7 +166,6 @@ class TrainerControllerTest {
         Map<String, Object> body = Map.of("isActive", false);
 
         mockMvc.perform(patch("/api/trainers/Bruce.Wayne/status")
-                        .header("X-Auth-Username", "Bruce.Wayne")
                         .header("X-Auth-Password", "raw")
                         .contentType("application/json")
                         .content(objectMapper.writeValueAsString(body)))
@@ -160,6 +185,19 @@ class TrainerControllerTest {
                         .header("X-Auth-Password", "raw"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].username").value("Bruce.Wayne"));
+
+        verify(authService).authenticate("John.Smith", "raw");
+    }
+
+    @Test
+    void getUnassigned_shouldReturn401_whenUsernameHeaderMissing() throws Exception {
+        // no {username} path variable on this endpoint — X-Auth-Username is
+        // the ONLY source of identity, so omitting it must be rejected.
+        mockMvc.perform(get("/api/trainers/unassigned")
+                        .header("X-Auth-Password", "raw"))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(trainerService);
     }
 
     @Test
@@ -171,16 +209,8 @@ class TrainerControllerTest {
                         TrainingTypeName.STRENGTH, 45, "Bruce", "John")));
 
         mockMvc.perform(get("/api/trainers/Bruce.Wayne/trainings")
-                        .header("X-Auth-Username", "Bruce.Wayne")
                         .header("X-Auth-Password", "raw"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].trainingName").value("S"));
-    }
-
-    @Test
-    void getProfile_shouldReturn400_whenAuthHeaderMissing() throws Exception {
-        // missing X-Auth-Password -> MissingRequestHeaderException -> 400
-        mockMvc.perform(get("/api/trainers/Bruce.Wayne"))
-                .andExpect(status().isBadRequest());
     }
 }

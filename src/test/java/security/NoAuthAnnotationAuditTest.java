@@ -7,6 +7,7 @@ import com.epam.gym.controller.TrainingController;
 import com.epam.gym.dto.request.*;
 import com.epam.gym.model.TrainingTypeName;
 import com.epam.gym.security.NoAuth;
+
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
@@ -34,21 +35,21 @@ class NoAuthAnnotationAuditTest {
     @Test
     void securedEndpoints_mustNotBeAnnotatedNoAuth() throws NoSuchMethodException {
         // TraineeController
-        assertRequiresAuth(TraineeController.class.getMethod("getProfile", String.class, String.class));
-        assertRequiresAuth(TraineeController.class.getMethod("update", String.class, UpdateTraineeRequest.class, String.class));
-        assertRequiresAuth(TraineeController.class.getMethod("delete", String.class, String.class));
-        assertRequiresAuth(TraineeController.class.getMethod("setActive", String.class, ActivateRequest.class, String.class));
-        assertRequiresAuth(TraineeController.class.getMethod("updateTrainers", String.class, UpdateTraineeTrainersRequest.class, String.class));
+        assertRequiresAuth(TraineeController.class.getMethod("getProfile", String.class));
+        assertRequiresAuth(TraineeController.class.getMethod("update", String.class, UpdateTraineeRequest.class));
+        assertRequiresAuth(TraineeController.class.getMethod("delete", String.class));
+        assertRequiresAuth(TraineeController.class.getMethod("setActive", String.class, ActivateRequest.class));
+        assertRequiresAuth(TraineeController.class.getMethod("updateTrainers", String.class, UpdateTraineeTrainersRequest.class));
         assertRequiresAuth(TraineeController.class.getMethod("getTrainings",
-                String.class, LocalDate.class, LocalDate.class, String.class, TrainingTypeName.class, String.class));
+                String.class, LocalDate.class, LocalDate.class, String.class, TrainingTypeName.class));
 
         // TrainerController
-        assertRequiresAuth(TrainerController.class.getMethod("getProfile", String.class, String.class));
-        assertRequiresAuth(TrainerController.class.getMethod("update", String.class, UpdateTrainerRequest.class, String.class));
-        assertRequiresAuth(TrainerController.class.getMethod("setActive", String.class, ActivateRequest.class, String.class));
-        assertRequiresAuth(TrainerController.class.getMethod("getUnassigned", String.class, String.class));
+        assertRequiresAuth(TrainerController.class.getMethod("getProfile", String.class));
+        assertRequiresAuth(TrainerController.class.getMethod("update", String.class, UpdateTrainerRequest.class));
+        assertRequiresAuth(TrainerController.class.getMethod("setActive", String.class, ActivateRequest.class));
+        assertRequiresAuth(TrainerController.class.getMethod("getUnassigned", String.class));
         assertRequiresAuth(TrainerController.class.getMethod("getTrainings",
-                String.class, LocalDate.class, LocalDate.class, String.class, String.class));
+                String.class, LocalDate.class, LocalDate.class, String.class));
     }
 
     private void assertNoAuth(Method method) {

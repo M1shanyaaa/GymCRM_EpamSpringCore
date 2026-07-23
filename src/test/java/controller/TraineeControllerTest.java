@@ -2,10 +2,13 @@ package controller;
 
 import com.epam.gym.controller.TraineeController;
 import com.epam.gym.dto.response.*;
+import com.epam.gym.exception.AuthenticationException;
 import com.epam.gym.exception.EntityNotFoundException;
 import com.epam.gym.exception.GlobalExceptionHandler;
 import com.epam.gym.filter.TransactionLoggingFilter;
 import com.epam.gym.model.TrainingTypeName;
+import com.epam.gym.security.AuthenticationInterceptor;
+import com.epam.gym.service.AuthService;
 import com.epam.gym.service.TraineeService;
 import com.epam.gym.service.TrainingService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -35,6 +38,7 @@ class TraineeControllerTest {
 
     @Mock private TraineeService traineeService;
     @Mock private TrainingService trainingService;
+    @Mock private AuthService authService;
 
     @InjectMocks private TraineeController traineeController;
 
@@ -52,6 +56,7 @@ class TraineeControllerTest {
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .addFilters(new TransactionLoggingFilter())
+                .addInterceptors(new AuthenticationInterceptor(authService))
                 .build();
     }
 
@@ -94,10 +99,11 @@ class TraineeControllerTest {
                         "Kyiv", true, List.of()));
 
         mockMvc.perform(get("/api/trainees/John.Smith")
-                        .header("X-Auth-Username", "John.Smith")
                         .header("X-Auth-Password", "raw"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.firstName").value("John"));
+
+        verify(authService).authenticate("John.Smith", "raw");
     }
 
     @Test
@@ -106,16 +112,29 @@ class TraineeControllerTest {
                 .thenThrow(new EntityNotFoundException("Trainee not found: Ghost"));
 
         mockMvc.perform(get("/api/trainees/Ghost")
-                        .header("X-Auth-Username", "Ghost")
                         .header("X-Auth-Password", "raw"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404));
     }
 
     @Test
-    void getProfile_shouldReturn400_whenPasswordHeaderMissing() throws Exception {
+    void getProfile_shouldReturn401_whenPasswordHeaderMissing() throws Exception {
+        // no X-Auth-Password header at all — AuthenticationInterceptor rejects
+        // it in preHandle, before the request ever reaches the controller.
         mockMvc.perform(get("/api/trainees/John.Smith"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(traineeService);
+    }
+
+    @Test
+    void getProfile_shouldReturn401_whenPasswordWrong() throws Exception {
+        doThrow(new AuthenticationException("Invalid credentials"))
+                .when(authService).authenticate("John.Smith", "wrong");
+
+        mockMvc.perform(get("/api/trainees/John.Smith")
+                        .header("X-Auth-Password", "wrong"))
+                .andExpect(status().isUnauthorized());
 
         verifyNoInteractions(traineeService);
     }
@@ -136,7 +155,6 @@ class TraineeControllerTest {
                 "isActive", true);
 
         mockMvc.perform(put("/api/trainees/John.Smith")
-                        .header("X-Auth-Username", "John.Smith")
                         .header("X-Auth-Password", "raw")
                         .contentType("application/json")
                         .content(objectMapper.writeValueAsString(body)))
@@ -148,7 +166,6 @@ class TraineeControllerTest {
     @Test
     void delete_shouldReturn200() throws Exception {
         mockMvc.perform(delete("/api/trainees/John.Smith")
-                        .header("X-Auth-Username", "John.Smith")
                         .header("X-Auth-Password", "raw"))
                 .andExpect(status().isOk());
 
@@ -160,7 +177,6 @@ class TraineeControllerTest {
         Map<String, Object> body = Map.of("isActive", false);
 
         mockMvc.perform(patch("/api/trainees/John.Smith/status")
-                        .header("X-Auth-Username", "John.Smith")
                         .header("X-Auth-Password", "raw")
                         .contentType("application/json")
                         .content(objectMapper.writeValueAsString(body)))
@@ -180,7 +196,6 @@ class TraineeControllerTest {
                 "trainerUsernames", List.of("Bruce.Wayne"));
 
         mockMvc.perform(put("/api/trainees/John.Smith/trainers")
-                        .header("X-Auth-Username", "John.Smith")
                         .header("X-Auth-Password", "raw")
                         .contentType("application/json")
                         .content(objectMapper.writeValueAsString(body)))
@@ -193,7 +208,6 @@ class TraineeControllerTest {
         Map<String, Object> body = Map.of("trainerUsernames", List.of());
 
         mockMvc.perform(put("/api/trainees/John.Smith/trainers")
-                        .header("X-Auth-Username", "John.Smith")
                         .header("X-Auth-Password", "raw")
                         .contentType("application/json")
                         .content(objectMapper.writeValueAsString(body)))
@@ -211,7 +225,6 @@ class TraineeControllerTest {
                         TrainingTypeName.STRENGTH, 45, "Bruce", "John")));
 
         mockMvc.perform(get("/api/trainees/John.Smith/trainings")
-                        .header("X-Auth-Username", "John.Smith")
                         .header("X-Auth-Password", "raw"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].trainingName").value("S"));

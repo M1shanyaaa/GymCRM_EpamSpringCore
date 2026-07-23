@@ -1,5 +1,6 @@
 package com.epam.gym.controller;
 
+import com.epam.gym.config.OpenApiConfig;
 import com.epam.gym.dto.request.ActivateRequest;
 import com.epam.gym.dto.request.TrainerRegistrationRequest;
 import com.epam.gym.dto.request.UpdateTrainerRequest;
@@ -14,6 +15,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
@@ -28,14 +30,11 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/trainers")
 @Tag(name = "Trainer", description = "Trainer management endpoints")
+@SecurityRequirement(name = OpenApiConfig.AUTH_PASSWORD_SCHEME)
 public class TrainerController {
 
     private static final Logger log = LoggerFactory.getLogger(TrainerController.class);
 
-    // Declared for OpenAPI docs / Spring header validation only — actual
-    // authentication is enforced globally by AuthenticationInterceptor, so
-    // these values are intentionally NOT forwarded to the service layer.
-    private static final String AUTH_PASS = "X-Auth-Password";
     private static final String AUTH_USER = "X-Auth-Username";
 
     private final TrainerService trainerService;
@@ -51,7 +50,8 @@ public class TrainerController {
     @PostMapping
     @NoAuth
     @Operation(summary = "Register a new trainer",
-            description = "Creates a trainer profile; username and password are auto-generated. No authentication required.")
+            description = "Creates a trainer profile; username and password are auto-generated. No authentication required.",
+            security = {})
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Trainer registered, credentials returned"),
             @ApiResponse(responseCode = "400", description = "Validation error")
@@ -73,8 +73,7 @@ public class TrainerController {
             @ApiResponse(responseCode = "404", description = "Trainer not found")
     })
     public ResponseEntity<TrainerProfileResponse> getProfile(
-            @Parameter(description = "Trainer username") @PathVariable String username,
-            @Parameter(description = "Auth password", required = true) @RequestHeader(AUTH_PASS) String password) {
+            @Parameter(description = "Trainer username") @PathVariable String username) {
         log.info("GET /api/trainers/{}", username);
         TrainerProfileResponse profile = trainerService.getProfile(username);
         return ResponseEntity.ok(profile);
@@ -92,8 +91,7 @@ public class TrainerController {
     })
     public ResponseEntity<TrainerProfileResponse> update(
             @Parameter(description = "Trainer username") @PathVariable String username,
-            @Valid @RequestBody UpdateTrainerRequest request,
-            @Parameter(description = "Auth password", required = true) @RequestHeader(AUTH_PASS) String password) {
+            @Valid @RequestBody UpdateTrainerRequest request) {
         log.info("PUT /api/trainers/{}", username);
         TrainerProfileResponse profile = trainerService.update(
                 username,
@@ -113,8 +111,7 @@ public class TrainerController {
     })
     public ResponseEntity<Void> setActive(
             @Parameter(description = "Trainer username") @PathVariable String username,
-            @Valid @RequestBody ActivateRequest request,
-            @Parameter(description = "Auth password", required = true) @RequestHeader(AUTH_PASS) String password) {
+            @Valid @RequestBody ActivateRequest request) {
         log.info("PATCH /api/trainers/{}/status -> {}", username, request.isActive());
         trainerService.setActive(username, request.isActive());
         return ResponseEntity.ok().build();
@@ -129,8 +126,7 @@ public class TrainerController {
             @ApiResponse(responseCode = "401", description = "Invalid credentials")
     })
     public ResponseEntity<List<TrainerShortResponse>> getUnassigned(
-            @Parameter(description = "Auth username (acting as Trainee)", required = true) @RequestHeader(AUTH_USER) String authUser,
-            @Parameter(description = "Auth password", required = true) @RequestHeader(AUTH_PASS) String authPass) {
+            @Parameter(description = "Auth username (acting as Trainee)", required = true) @RequestHeader(AUTH_USER) String authUser) {
         log.info("GET /api/trainers/unassigned (trainee='{}')", authUser);
         List<TrainerShortResponse> result = trainerService.findUnassignedTrainers(authUser);
         return ResponseEntity.ok(result);
@@ -149,8 +145,7 @@ public class TrainerController {
             @Parameter(description = "Trainer username") @PathVariable String username,
             @Parameter(description = "Period from (yyyy-MM-dd)") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @Parameter(description = "Period to (yyyy-MM-dd)") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @Parameter(description = "Filter by trainee name") @RequestParam(required = false) String traineeName,
-            @Parameter(description = "Auth password", required = true) @RequestHeader(AUTH_PASS) String password) {
+            @Parameter(description = "Filter by trainee name") @RequestParam(required = false) String traineeName) {
         log.info("GET /api/trainers/{}/trainings", username);
         List<TrainingResponse> trainings = trainingService.getTrainerTrainings(
                 username, from, to, traineeName);
