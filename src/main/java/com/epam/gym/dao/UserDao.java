@@ -9,4 +9,6 @@ public interface UserDao {
     Optional<User> findByUsername(String username);
 
     boolean existsByUsername(String username);
+
+    User update(User user);
 }

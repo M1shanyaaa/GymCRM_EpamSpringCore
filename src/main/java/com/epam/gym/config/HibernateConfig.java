@@ -55,7 +55,7 @@ public class HibernateConfig {
     public LocalSessionFactoryBean sessionFactory(DataSource dataSource) {
         LocalSessionFactoryBean factory = new LocalSessionFactoryBean();
         factory.setDataSource(dataSource);
-        factory.setPackagesToScan("com.epam.gym.model");  // where is @Entity
+        factory.setPackagesToScan("com.epam.gym.model");
         factory.setHibernateProperties(hibernateProperties());
         return factory;
     }

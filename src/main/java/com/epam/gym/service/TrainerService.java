@@ -2,7 +2,11 @@ package com.epam.gym.service;
 
 import com.epam.gym.dao.TrainerDao;
 import com.epam.gym.dao.TrainingTypeDao;
+import com.epam.gym.dto.response.CredentialsResponse;
+import com.epam.gym.dto.response.TrainerProfileResponse;
+import com.epam.gym.dto.response.TrainerShortResponse;
 import com.epam.gym.exception.EntityNotFoundException;
+import com.epam.gym.mapper.TrainerMapper;
 import com.epam.gym.model.Trainer;
 import com.epam.gym.model.TrainingType;
 import com.epam.gym.model.TrainingTypeName;
@@ -19,6 +23,17 @@ import org.springframework.util.StringUtils;
 
 import java.util.List;
 
+/**
+ * Business logic for Trainer entities.
+ * <p>
+ * Authentication for every method below except {@link #create} is enforced
+ * globally by {@code AuthenticationInterceptor} before the request ever
+ * reaches this service. This service therefore has no dependency on
+ * {@link AuthService}.
+ * <p>
+ * Password changes are handled exclusively by {@link AuthService#changePassword}
+ * (see {@code AuthController}) — do not duplicate that logic here.
+ */
 @Service
 public class TrainerService {
 
@@ -29,7 +44,7 @@ public class TrainerService {
     private final UsernameGenerator usernameGenerator;
     private final PasswordGenerator passwordGenerator;
     private final PasswordEncoder passwordEncoder;
-    private final AuthService authService;
+    private final TrainerMapper trainerMapper;
 
     @Autowired
     public TrainerService(TrainerDao trainerDao,
@@ -37,19 +52,23 @@ public class TrainerService {
                           UsernameGenerator usernameGenerator,
                           PasswordGenerator passwordGenerator,
                           PasswordEncoder passwordEncoder,
-                          AuthService authService) {
+                          TrainerMapper trainerMapper) {
         this.trainerDao = trainerDao;
         this.trainingTypeDao = trainingTypeDao;
         this.usernameGenerator = usernameGenerator;
         this.passwordGenerator = passwordGenerator;
         this.passwordEncoder = passwordEncoder;
-        this.authService = authService;
+        this.trainerMapper = trainerMapper;
     }
 
-    // ---------- Function 1: Create Trainer profile ----------
+    // ---------- Endpoint 2: Trainer registration (public, no auth) ----------
     @Transactional
-    public Trainer create(String firstName, String lastName, TrainingTypeName specialization) {
-        validateRequired(firstName, lastName, specialization);
+    public CredentialsResponse create(String firstName, String lastName,
+                                      TrainingTypeName specialization) {
+        validateRequired(firstName, lastName);
+        if (specialization == null) {
+            throw new IllegalArgumentException("Specialization is required");
+        }
 
         TrainingType type = trainingTypeDao.findByName(specialization)
                 .orElseThrow(() -> new EntityNotFoundException(
@@ -73,73 +92,49 @@ public class TrainerService {
         Trainer saved = trainerDao.save(trainer);
         log.info("Created trainer profile: username='{}', id={}",
                 saved.getUser().getUsername(), saved.getId());
-        return saved;
+
+        return new CredentialsResponse(saved.getUser().getUsername(), rawPassword);
     }
 
-    // ---------- Function 5: Select Trainer profile by username ----------
+    // ---------- Endpoint 8: Get Trainer profile ----------
     @Transactional(readOnly = true)
-    public Trainer findByUsername(String username, String password) {
-        authService.authenticate(username, password);
-        return getTrainerOrThrow(username);
-    }
-
-    // ---------- Function 8: Trainer password change ----------
-    @Transactional
-    public void changePassword(String username, String oldPassword, String newPassword) {
-        authService.authenticate(username, oldPassword);
-
-        if (!StringUtils.hasText(newPassword)) {
-            throw new IllegalArgumentException("New password must not be blank");
-        }
-
+    public TrainerProfileResponse getProfile(String username) {
         Trainer trainer = getTrainerOrThrow(username);
-        trainer.getUser().setPassword(passwordEncoder.encode(newPassword));
-        trainerDao.update(trainer);
-        log.info("Password changed for trainer '{}'", username);
+        return trainerMapper.toProfile(trainer);
     }
 
-    // ---------- Function 9: Update Trainer profile ----------
+    // ---------- Endpoint 9: Update Trainer profile (specialization is read-only) ----------
     @Transactional
-    public Trainer update(String username, String password,
-                          String firstName, String lastName,
-                          TrainingTypeName specialization) {
-        authService.authenticate(username, password);
-        validateRequired(firstName, lastName, specialization);
-
-        TrainingType type = trainingTypeDao.findByName(specialization)
-                .orElseThrow(() -> new EntityNotFoundException(
-                        "Training type not found: " + specialization));
+    public TrainerProfileResponse update(String username,
+                                         String firstName, String lastName,
+                                         boolean isActive) {
+        validateRequired(firstName, lastName);
 
         Trainer trainer = getTrainerOrThrow(username);
         trainer.getUser().setFirstName(firstName);
         trainer.getUser().setLastName(lastName);
-        trainer.setSpecialization(type);
+        trainer.getUser().setActive(isActive);
+        // specialization intentionally NOT modified (read-only per spec)
 
         Trainer updated = trainerDao.update(trainer);
         log.info("Updated trainer profile '{}'", username);
-        return updated;
+        return trainerMapper.toProfile(updated);
     }
 
-    // ---------- Function 12: Activate/De-activate trainer (NOT idempotent) ----------
+    // ---------- Endpoint 16: Activate/De-activate ----------
     @Transactional
-    public void toggleActive(String username, String password) {
-        authService.authenticate(username, password);
-
+    public void setActive(String username, boolean isActive) {
         Trainer trainer = getTrainerOrThrow(username);
-        boolean newStatus = !trainer.getUser().isActive();
-        trainer.getUser().setActive(newStatus);
+        trainer.getUser().setActive(isActive);
         trainerDao.update(trainer);
-        log.info("Trainer '{}' active status changed to {}", username, newStatus);
+        log.info("Trainer '{}' active status set to {}", username, isActive);
     }
 
-    // ---------- Function 17: Trainers not assigned to a trainee ----------
+    // ---------- Endpoint 10: Get not-assigned active trainers ----------
     @Transactional(readOnly = true)
-    public List<Trainer> findUnassignedTrainers(String traineeUsername, String password) {
-        authService.authenticate(traineeUsername, password);
-
-        List<Trainer> result = trainerDao.findUnassignedTrainers(traineeUsername);
-        log.debug("Found {} unassigned trainers for trainee '{}'", result.size(), traineeUsername);
-        return result;
+    public List<TrainerShortResponse> findUnassignedTrainers(String traineeUsername) {
+        List<Trainer> unassigned = trainerDao.findUnassignedTrainers(traineeUsername);
+        return trainerMapper.toShortList(unassigned);
     }
 
     // ---------- helpers ----------
@@ -149,12 +144,9 @@ public class TrainerService {
                         "Trainer not found: " + username));
     }
 
-    private void validateRequired(String firstName, String lastName, TrainingTypeName specialization) {
+    private void validateRequired(String firstName, String lastName) {
         if (!StringUtils.hasText(firstName) || !StringUtils.hasText(lastName)) {
             throw new IllegalArgumentException("First name and last name are required");
-        }
-        if (specialization == null) {
-            throw new IllegalArgumentException("Specialization is required");
         }
     }
 }

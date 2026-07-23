@@ -41,4 +41,11 @@ public class UserDaoImpl implements UserDao {
         log.debug("existsByUsername({}) -> {}", username, count > 0);
         return count > 0;
     }
+
+    @Override
+    public User update(User user) {
+        User merged = sessionFactory.getCurrentSession().merge(user);
+        log.debug("update(user id={}) -> success", user.getId());
+        return merged;
+    }
 }
