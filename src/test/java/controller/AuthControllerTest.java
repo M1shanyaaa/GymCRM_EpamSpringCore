@@ -4,18 +4,18 @@ import com.epam.gym.controller.AuthController;
 import com.epam.gym.exception.AuthenticationException;
 import com.epam.gym.exception.EntityNotFoundException;
 import com.epam.gym.exception.GlobalExceptionHandler;
+import com.epam.gym.filter.TransactionLoggingFilter;
 import com.epam.gym.service.AuthService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import org.junit.jupiter.api.AfterEach;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.slf4j.MDC;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -29,9 +29,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ExtendWith(MockitoExtension.class)
 class AuthControllerTest {
 
-    @Mock private AuthService authService;
+    @Mock
+    private AuthService authService;
 
-    @InjectMocks private AuthController authController;
+    @InjectMocks
+    private AuthController authController;
 
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
@@ -46,15 +48,21 @@ class AuthControllerTest {
                 .standaloneSetup(authController)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .addFilters(new TransactionLoggingFilter())
                 .build();
     }
 
+    // ---------- login (POST, credentials in JSON body) ----------
+
     @Test
     void login_shouldReturn200_whenValid() throws Exception {
-        mockMvc.perform(get("/api/login")
-                        .header("X-Auth-Username", "John.Smith")
-                        .header("X-Auth-Password", "raw"))
+        Map<String, String> body = Map.of("username", "John.Smith", "password", "raw");
+
+        mockMvc.perform(post("/api/login")
+                        .contentType("application/json")
+                        .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isOk());
+
         verify(authService).authenticate("John.Smith", "raw");
     }
 
@@ -62,18 +70,40 @@ class AuthControllerTest {
     void login_shouldReturn401_whenInvalid() throws Exception {
         doThrow(new AuthenticationException("Invalid username or password"))
                 .when(authService).authenticate("John.Smith", "wrong");
-        mockMvc.perform(get("/api/login")
-                        .header("X-Auth-Username", "John.Smith")
-                        .header("X-Auth-Password", "wrong"))
+
+        Map<String, String> body = Map.of("username", "John.Smith", "password", "wrong");
+
+        mockMvc.perform(post("/api/login")
+                        .contentType("application/json")
+                        .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
-    void login_shouldReturn400_whenHeaderMissing() throws Exception {
-        mockMvc.perform(get("/api/login"))
+    void login_shouldReturn400_whenUsernameBlank() throws Exception {
+        Map<String, String> body = Map.of("username", "", "password", "raw");
+
+        mockMvc.perform(post("/api/login")
+                        .contentType("application/json")
+                        .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isBadRequest());
+
         verifyNoInteractions(authService);
     }
+
+    @Test
+    void login_shouldReturn400_whenPasswordMissing() throws Exception {
+        Map<String, String> body = Map.of("username", "John.Smith");
+
+        mockMvc.perform(post("/api/login")
+                        .contentType("application/json")
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(authService);
+    }
+
+    // ---------- changePassword (PUT, username in path, not in body) ----------
 
     @Test
     void changePassword_shouldReturn200_whenValid() throws Exception {

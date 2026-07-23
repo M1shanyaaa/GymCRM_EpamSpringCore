@@ -4,12 +4,15 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+
 import com.epam.gym.filter.TransactionLoggingFilter;
+
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletResponse;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -184,7 +187,8 @@ class TransactionLoggingFilterTest {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/trainees");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
-        FilterChain chain = (req, res) -> { };
+        FilterChain chain = (req, res) -> {
+        };
 
         filter.doFilter(request, response, chain);
 
@@ -233,4 +237,29 @@ class TransactionLoggingFilterTest {
 
         assertThat(hasCleanPayload).isTrue();
     }
+
+    @Test
+    void shouldDropTrailingReplacementChar_whenTruncationSplitsMultiByteUtf8Character() throws Exception {
+        String longBody = "a".repeat(4999) + "é" + "a".repeat(100);
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/trainees");
+        request.setContent(longBody.getBytes(StandardCharsets.UTF_8));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        FilterChain chain = (req, res) -> req.getInputStream().readAllBytes();
+
+        filter.doFilter(request, response, chain);
+
+        String prefix = "Request Payload: ";
+        Optional<String> payloadMessage = appender.list.stream()
+                .map(ILoggingEvent::getFormattedMessage)
+                .filter(m -> m.startsWith(prefix))
+                .findFirst();
+
+        assertThat(payloadMessage).isPresent();
+        String payload = payloadMessage.get().substring(prefix.length());
+        assertThat(payload).hasSize(4999);
+        assertThat(payload).doesNotContain("\uFFFD");
+        assertThat(payload).matches("a+");
+    }
+
 }

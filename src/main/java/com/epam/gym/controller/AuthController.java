@@ -1,6 +1,7 @@
 package com.epam.gym.controller;
 
 import com.epam.gym.dto.request.ChangePasswordRequest;
+import com.epam.gym.dto.request.LoginRequest;
 import com.epam.gym.security.NoAuth;
 import com.epam.gym.service.AuthService;
 
@@ -29,20 +30,19 @@ public class AuthController {
         this.authService = authService;
     }
 
-    // ---------- Endpoint 3: Login (GET) ----------
-    @GetMapping("/login")
+    // ---------- Endpoint 3: Login (POST) ----------
+    @PostMapping("/login")
     @NoAuth
     @Operation(summary = "User login",
-            description = "Authenticates user using headers and returns 200 OK if credentials are correct.")
+            description = "Authenticates user using credentials in the JSON request body and returns 200 OK if correct.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Successfully authenticated"),
+            @ApiResponse(responseCode = "400", description = "Validation error"),
             @ApiResponse(responseCode = "401", description = "Invalid credentials")
     })
-    public ResponseEntity<Void> login(
-            @Parameter(description = "Auth username", required = true) @RequestHeader("X-Auth-Username") String username,
-            @Parameter(description = "Auth password", required = true) @RequestHeader("X-Auth-Password") String password) {
-        log.info("GET /api/login — user '{}'", username);
-        authService.authenticate(username, password);
+    public ResponseEntity<Void> login(@Valid @RequestBody LoginRequest request) {
+        log.info("POST /api/login — user '{}'", request.username());
+        authService.authenticate(request.username(), request.password());
         return ResponseEntity.ok().build();
     }
 

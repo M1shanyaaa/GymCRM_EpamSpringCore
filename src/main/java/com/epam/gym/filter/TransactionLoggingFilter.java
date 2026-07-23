@@ -20,6 +20,8 @@ public class TransactionLoggingFilter implements Filter {
 
     private static final Logger log = LoggerFactory.getLogger(TransactionLoggingFilter.class);
     private static final String TRANSACTION_ID_KEY = "transactionId";
+    private static final int MAX_PAYLOAD_LENGTH = 5000;
+    private static final char UTF8_REPLACEMENT_CHAR = '\uFFFD';
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
@@ -82,9 +84,13 @@ public class TransactionLoggingFilter implements Filter {
 
     private String getPayload(byte[] buf) {
         if (buf == null || buf.length == 0) return "";
-        // Limit log length to avoid massive JSONs taking up memory
-        int length = Math.min(buf.length, 5000);
-        String payload = new String(buf, 0, length, StandardCharsets.UTF_8).replaceAll("[\\r\\n]+", " ");
+        int length = Math.min(buf.length, MAX_PAYLOAD_LENGTH);
+        String truncated = new String(buf, 0, length, StandardCharsets.UTF_8);
+        if (!truncated.isEmpty() && truncated.charAt(truncated.length() - 1) == UTF8_REPLACEMENT_CHAR) {
+            truncated = truncated.substring(0, truncated.length() - 1);
+        }
+
+        String payload = truncated.replaceAll("[\\r\\n]+", " ");
         return maskSensitiveData(payload);
     }
 
