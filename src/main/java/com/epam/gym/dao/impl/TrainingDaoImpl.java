@@ -3,15 +3,13 @@ package com.epam.gym.dao.impl;
 import com.epam.gym.dao.TrainingDao;
 import com.epam.gym.model.*;
 
-import jakarta.persistence.EntityManagerFactory;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.criteria.*;
 
 import org.hibernate.Session;
-import org.hibernate.SessionFactory;
-import org.hibernate.Transaction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
@@ -23,17 +21,13 @@ public class TrainingDaoImpl implements TrainingDao {
 
     private static final Logger log = LoggerFactory.getLogger(TrainingDaoImpl.class);
 
-    private final SessionFactory sessionFactory;
-
-    @Autowired
-    public TrainingDaoImpl(EntityManagerFactory emf) {
-        this.sessionFactory = emf.unwrap(SessionFactory.class);
-    }
+    @PersistenceContext
+    private EntityManager entityManager;
 
     // ---------- Add training (Function 16) ----------
     @Override
     public Training save(Training training) {
-        sessionFactory.getCurrentSession().persist(training);
+        entityManager.unwrap(Session.class).persist(training);
         log.debug("Persisted training with id={}", training.getId());
         return training;
     }
@@ -46,7 +40,7 @@ public class TrainingDaoImpl implements TrainingDao {
                                                LocalDate toDate,
                                                String trainerName,
                                                TrainingTypeName trainingType) {
-        Session session = sessionFactory.getCurrentSession();
+        Session session = entityManager.unwrap(Session.class);
         CriteriaBuilder cb = session.getCriteriaBuilder();
         CriteriaQuery<Training> query = cb.createQuery(Training.class);
         Root<Training> root = query.from(Training.class);
@@ -107,7 +101,7 @@ public class TrainingDaoImpl implements TrainingDao {
             hql.append(" AND teu.firstName = :traineeName");
         }
 
-        var query = sessionFactory.getCurrentSession()
+        var query = entityManager.unwrap(Session.class)
                 .createQuery(hql.toString(), Training.class)
                 .setParameter("trainerUsername", trainerUsername);
 
