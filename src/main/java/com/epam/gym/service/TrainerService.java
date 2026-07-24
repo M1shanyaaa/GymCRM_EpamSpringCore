@@ -24,6 +24,9 @@ import org.springframework.util.StringUtils;
 
 import java.util.List;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+
 /**
  * Business logic for Trainer entities.
  * <p>
@@ -46,6 +49,7 @@ public class TrainerService {
     private final PasswordGenerator passwordGenerator;
     private final PasswordEncoder passwordEncoder;
     private final TrainerMapper trainerMapper;
+    private final Counter registrationCounter;
 
     @Autowired
     public TrainerService(TrainerDao trainerDao,
@@ -53,13 +57,17 @@ public class TrainerService {
                           UsernameGenerator usernameGenerator,
                           PasswordGenerator passwordGenerator,
                           PasswordEncoder passwordEncoder,
-                          TrainerMapper trainerMapper) {
+                          TrainerMapper trainerMapper,
+                          MeterRegistry meterRegistry) {
         this.trainerDao = trainerDao;
         this.trainingTypeDao = trainingTypeDao;
         this.usernameGenerator = usernameGenerator;
         this.passwordGenerator = passwordGenerator;
         this.passwordEncoder = passwordEncoder;
         this.trainerMapper = trainerMapper;
+        this.registrationCounter = Counter.builder("gym.trainer.registrations.total")
+                .description("Total number of registered trainers")
+                .register(meterRegistry);
     }
 
     // ---------- Endpoint 2: Trainer registration (public, no auth) ----------
@@ -93,6 +101,8 @@ public class TrainerService {
         Trainer saved = trainerDao.save(trainer);
         log.info("Created trainer profile: username='{}', id={}",
                 saved.getUser().getUsername(), saved.getId());
+
+        registrationCounter.increment();
 
         return new CredentialsResponse(saved.getUser().getUsername(), rawPassword);
     }

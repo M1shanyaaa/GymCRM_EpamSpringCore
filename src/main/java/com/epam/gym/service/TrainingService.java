@@ -23,6 +23,9 @@ import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+
 /**
  * Business logic for Training sessions and training types.
  * <p>
@@ -50,6 +53,7 @@ public class TrainingService {
     private final AuthService authService;
     private final TrainingMapper trainingMapper;
     private final TrainerMapper trainerMapper;
+    private final Timer searchTimer;
 
     @Autowired
     public TrainingService(TrainingDao trainingDao,
@@ -58,7 +62,8 @@ public class TrainingService {
                            TrainingTypeDao trainingTypeDao,
                            AuthService authService,
                            TrainingMapper trainingMapper,
-                           TrainerMapper trainerMapper) {
+                           TrainerMapper trainerMapper,
+                           MeterRegistry meterRegistry) {
         this.trainingDao = trainingDao;
         this.traineeDao = traineeDao;
         this.trainerDao = trainerDao;
@@ -66,11 +71,14 @@ public class TrainingService {
         this.authService = authService;
         this.trainingMapper = trainingMapper;
         this.trainerMapper = trainerMapper;
+        this.searchTimer = Timer.builder("gym.training.search.time")
+                .description("Time taken to fetch trainings by criteria")
+                .register(meterRegistry);
     }
 
     // ---------- Endpoint 14: Add training ----------
     // NOTE: controller endpoint is @NoAuth (credentials come from the request
-    // body, not headers — see TrainingController TODO), so this is the only
+    // body, not headers — see TrainingController), so this is the only
     // remaining place in this service that must authenticate explicitly.
     @Transactional
     public void addTraining(String callerUsername, String callerPassword,
@@ -110,10 +118,12 @@ public class TrainingService {
     public List<TrainingResponse> getTraineeTrainings(String username,
                                                       LocalDate fromDate, LocalDate toDate,
                                                       String trainerName, TrainingTypeName trainingType) {
-        List<Training> result = trainingDao.findTraineeTrainings(
-                username, fromDate, toDate, trainerName, trainingType);
-        log.debug("Trainee '{}' trainings found: {}", username, result.size());
-        return trainingMapper.toResponseList(result);
+        return searchTimer.record(() -> {
+            List<Training> result = trainingDao.findTraineeTrainings(
+                    username, fromDate, toDate, trainerName, trainingType);
+            log.debug("Trainee '{}' trainings found: {}", username, result.size());
+            return trainingMapper.toResponseList(result);
+        });
     }
 
     // ---------- Endpoint 13: Trainer trainings by criteria ----------
@@ -121,10 +131,12 @@ public class TrainingService {
     public List<TrainingResponse> getTrainerTrainings(String username,
                                                       LocalDate fromDate, LocalDate toDate,
                                                       String traineeName) {
-        List<Training> result = trainingDao.findTrainerTrainings(
-                username, fromDate, toDate, traineeName);
-        log.debug("Trainer '{}' trainings found: {}", username, result.size());
-        return trainingMapper.toResponseList(result);
+        return searchTimer.record(() -> {
+            List<Training> result = trainingDao.findTrainerTrainings(
+                    username, fromDate, toDate, traineeName);
+            log.debug("Trainer '{}' trainings found: {}", username, result.size());
+            return trainingMapper.toResponseList(result);
+        });
     }
 
     // ---------- Endpoint 11: Update trainee's trainers list ----------

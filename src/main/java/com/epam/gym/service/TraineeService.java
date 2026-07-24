@@ -20,6 +20,9 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+
 /**
  * Business logic for Trainee entities.
  * <p>
@@ -42,18 +45,23 @@ public class TraineeService {
     private final PasswordGenerator passwordGenerator;
     private final PasswordEncoder passwordEncoder;
     private final TraineeMapper traineeMapper;
+    private final Counter registrationCounter;
 
     @Autowired
     public TraineeService(TraineeDao traineeDao,
                           UsernameGenerator usernameGenerator,
                           PasswordGenerator passwordGenerator,
                           PasswordEncoder passwordEncoder,
-                          TraineeMapper traineeMapper) {
+                          TraineeMapper traineeMapper,
+                          MeterRegistry meterRegistry) {
         this.traineeDao = traineeDao;
         this.usernameGenerator = usernameGenerator;
         this.passwordGenerator = passwordGenerator;
         this.passwordEncoder = passwordEncoder;
         this.traineeMapper = traineeMapper;
+        this.registrationCounter = Counter.builder("gym.trainee.registrations.total")
+                .description("Total number of registered trainees")
+                .register(meterRegistry);
     }
 
     // ---------- Endpoint 1: Trainee registration (public, no auth) ----------
@@ -82,6 +90,7 @@ public class TraineeService {
         log.info("Created trainee profile: username='{}', id={}",
                 saved.getUser().getUsername(), saved.getId());
 
+        registrationCounter.increment();
         // raw password is returned only here, never stored/logged
         return new CredentialsResponse(saved.getUser().getUsername(), rawPassword);
     }
