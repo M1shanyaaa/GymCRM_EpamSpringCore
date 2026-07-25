@@ -8,6 +8,7 @@ import com.epam.gym.model.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
 
 import java.util.List;
@@ -21,10 +22,15 @@ class TrainerDaoITest {
 
     @Autowired
     private TrainerDao trainerDao;
+
     @Autowired
     private TraineeDao traineeDao;
+
     @Autowired
     private TrainingTypeDao trainingTypeDao;
+
+    @Autowired
+    private TestEntityManager entityManager;
 
     private TrainingType persistType(TrainingTypeName name) {
         return trainingTypeDao.save(new TrainingType(name));
@@ -88,6 +94,8 @@ class TrainerDaoITest {
         saved.getUser().setLastName("Banner");
 
         trainerDao.update(saved);
+        entityManager.flush();
+        entityManager.clear();
 
         Trainer reloaded = trainerDao.findByUsername("Bruce.Wayne").orElseThrow();
         assertThat(reloaded.getUser().getLastName()).isEqualTo("Banner");

@@ -71,6 +71,8 @@ class TraineeDaoITest {
         saved.getUser().setFirstName("Johnny");
 
         traineeDao.update(saved);
+        entityManager.flush();
+        entityManager.clear();
 
         Trainee reloaded = traineeDao.findByUsername("John.Smith").orElseThrow();
         assertThat(reloaded.getAddress()).isEqualTo("Lviv");
