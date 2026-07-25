@@ -1,6 +1,7 @@
 package com.epam.gym.config;
 
 import com.zaxxer.hikari.HikariDataSource;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -105,6 +106,21 @@ public class DatabaseConfig {
         return hibernateProperties -> {
             hibernateProperties.put("hibernate.show_sql", "true");
             hibernateProperties.put("hibernate.format_sql", "true");
+            hibernateProperties.put("hibernate.hbm2ddl.auto", "update");
+        };
+    }
+
+    /**
+     * Hibernate configuration for STG and PROD (DATABASE PROTECTION).
+     * Replaces spring.jpa.hibernate.ddl-auto=validate in properties.
+     */
+    @Bean
+    @Profile({"stg", "prod"})
+    public HibernatePropertiesCustomizer prodHibernateCustomizer() {
+        log.info("Configuring Hibernate for PROD (show_sql=false, ddl-auto=validate)...");
+        return hibernateProperties -> {
+            hibernateProperties.put("hibernate.show_sql", "false");
+            hibernateProperties.put("hibernate.hbm2ddl.auto", "validate");
         };
     }
 }
