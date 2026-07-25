@@ -1,7 +1,9 @@
 package com.epam.gym.service;
 
-import com.epam.gym.exception.AuthenticationException;
 import com.epam.gym.dao.UserDao;
+import com.epam.gym.exception.AuthenticationException;
+import com.epam.gym.exception.EntityNotFoundException;
+import com.epam.gym.model.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,10 +11,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Handles username/password authentication.
- * Must be invoked before any protected operation.
- */
 @Service
 public class AuthService {
 
@@ -27,18 +25,12 @@ public class AuthService {
         this.passwordEncoder = passwordEncoder;
     }
 
-    /**
-     * Checks whether the given username/password pair matches an existing user.
-     *
-     * @return true if credentials are valid, false otherwise
-     */
     @Transactional(readOnly = true)
     public boolean matches(String username, String rawPassword) {
         if (username == null || rawPassword == null) {
             log.warn("Authentication attempt with null username or password");
             return false;
         }
-
         return userDao.findByUsername(username)
                 .map(user -> passwordEncoder.matches(rawPassword, user.getPassword()))
                 .orElseGet(() -> {
@@ -47,12 +39,6 @@ public class AuthService {
                 });
     }
 
-    /**
-     * Authenticates the user and throws if credentials are invalid.
-     * Convenience method for guarding protected operations.
-     *
-     * @throws AuthenticationException if credentials don't match
-     */
     @Transactional(readOnly = true)
     public void authenticate(String username, String rawPassword) {
         if (!matches(username, rawPassword)) {
@@ -60,5 +46,24 @@ public class AuthService {
             throw new AuthenticationException("Invalid username or password");
         }
         log.debug("User '{}' authenticated successfully", username);
+    }
+
+    /**
+     * Changes the user's password after verifying the old one.
+     *
+     * @throws AuthenticationException if old credentials are invalid
+     * @throws EntityNotFoundException if the user does not exist
+     */
+    @Transactional
+    public void changePassword(String username, String oldPassword, String newPassword) {
+        authenticate(username, oldPassword);  // verify current credentials
+
+        User user = userDao.findByUsername(username)
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "User not found: " + username));
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userDao.update(user);
+        log.info("Password changed for user '{}'", username);
     }
 }
