@@ -3,7 +3,6 @@ package com.epam.gym.service;
 import com.epam.gym.dao.UserDao;
 import com.epam.gym.exception.AuthenticationException;
 import com.epam.gym.model.User;
-import com.epam.gym.service.AuthService;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;

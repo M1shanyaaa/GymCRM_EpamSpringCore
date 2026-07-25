@@ -12,9 +12,6 @@ import com.epam.gym.exception.EntityNotFoundException;
 import com.epam.gym.mapper.TrainerMapper;
 import com.epam.gym.mapper.TrainingMapper;
 import com.epam.gym.model.*;
-import com.epam.gym.service.AuthService;
-import com.epam.gym.service.TrainingService;
-
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;

@@ -7,7 +7,6 @@ import com.epam.gym.exception.EntityNotFoundException;
 import com.epam.gym.mapper.TraineeMapper;
 import com.epam.gym.model.Trainee;
 import com.epam.gym.model.User;
-import com.epam.gym.service.TraineeService;
 import com.epam.gym.util.PasswordGenerator;
 import com.epam.gym.util.UsernameGenerator;
 

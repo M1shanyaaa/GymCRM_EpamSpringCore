@@ -11,7 +11,6 @@ import com.epam.gym.model.Trainer;
 import com.epam.gym.model.TrainingType;
 import com.epam.gym.model.TrainingTypeName;
 import com.epam.gym.model.User;
-import com.epam.gym.service.TrainerService;
 import com.epam.gym.util.PasswordGenerator;
 import com.epam.gym.util.UsernameGenerator;
 
