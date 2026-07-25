@@ -64,6 +64,12 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.BAD_REQUEST, "Malformed JSON request body", request);
     }
 
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleConflict(Exception ex, HttpServletRequest request) {
+        log.warn("Data conflict: {}", ex.getMessage());
+        return build(HttpStatus.CONFLICT, "Database conflict: data already exists or constraint violated", request);
+    }
+
     // 500 — fallback for anything unexpected
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneric(Exception ex,
