@@ -38,6 +38,11 @@ public class TransactionLoggingFilter implements Filter {
 
         HttpServletRequest req = (HttpServletRequest) request;
         HttpServletResponse res = (HttpServletResponse) response;
+        String uri = req.getRequestURI();
+        if (uri.startsWith("/actuator") || uri.startsWith("/swagger") || uri.startsWith("/v3/api-docs")) {
+            chain.doFilter(request, response);
+            return;
+        }
 
         // 1. Generate transactionId and add it to MDC
         String transactionId = UUID.randomUUID().toString();
