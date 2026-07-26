@@ -5,7 +5,6 @@ import com.epam.gym.model.Trainer;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
-import org.hibernate.Session;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
@@ -23,34 +22,35 @@ public class TrainerDaoImpl implements TrainerDao {
 
     @Override
     public Trainer save(Trainer trainer) {
-        entityManager.unwrap(Session.class).persist(trainer);
+        entityManager.persist(trainer);
         log.debug("Persisted trainer with id={}", trainer.getId());
         return trainer;
     }
 
     @Override
     public Trainer update(Trainer trainer) {
-        Trainer merged = entityManager.unwrap(Session.class).merge(trainer);
+        Trainer merged = entityManager.merge(trainer);
         log.debug("Merged trainer with id={}", merged.getId());
         return merged;
     }
 
     @Override
     public Optional<Trainer> findById(Long id) {
-        Trainer trainer = entityManager.unwrap(Session.class).get(Trainer.class, id);
+        Trainer trainer = entityManager.find(Trainer.class, id);
         log.debug("findById({}) -> found={}", id, trainer != null);
         return Optional.ofNullable(trainer);
     }
 
     @Override
     public Optional<Trainer> findByUsername(String username) {
-        Trainer trainer = entityManager.unwrap(Session.class)
-                .createQuery(
-                        "FROM Trainer t WHERE t.user.username = :username", Trainer.class)
+        Optional<Trainer> trainer = entityManager
+                .createQuery("FROM Trainer t WHERE t.user.username = :username", Trainer.class)
                 .setParameter("username", username)
-                .uniqueResult();
-        log.debug("findByUsername({}) -> found={}", username, trainer != null);
-        return Optional.ofNullable(trainer);
+                .getResultList()
+                .stream()
+                .findFirst();
+        log.debug("findByUsername({}) -> found={}", username, trainer.isPresent());
+        return trainer;
     }
 
     @Override
@@ -58,26 +58,23 @@ public class TrainerDaoImpl implements TrainerDao {
         if (usernames == null || usernames.isEmpty()) {
             return List.of();
         }
-        List<Trainer> result = entityManager.unwrap(Session.class)
-                .createQuery(
-                        "SELECT t FROM Trainer t WHERE t.user.username IN (:usernames)",
-                        Trainer.class)
+        List<Trainer> result = entityManager
+                .createQuery("SELECT t FROM Trainer t WHERE t.user.username IN (:usernames)", Trainer.class)
                 .setParameter("usernames", usernames)
-                .list();
+                .getResultList();
         log.debug("findByUsernames({}) -> count={}", usernames, result.size());
         return result;
     }
 
     @Override
     public List<Trainer> findUnassignedTrainers(String traineeUsername) {
-        // Trainers that are NOT in the trainee's trainers set
-        List<Trainer> result = entityManager.unwrap(Session.class)
+        List<Trainer> result = entityManager
                 .createQuery(
                         "SELECT t FROM Trainer t WHERE t.id NOT IN " +
                                 "(SELECT tr.id FROM Trainee te JOIN te.trainers tr " +
                                 " WHERE te.user.username = :username)", Trainer.class)
                 .setParameter("username", traineeUsername)
-                .list();
+                .getResultList();
         log.debug("findUnassignedTrainers({}) -> count={}", traineeUsername, result.size());
         return result;
     }

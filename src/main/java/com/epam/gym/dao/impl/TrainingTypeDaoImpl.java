@@ -6,7 +6,6 @@ import com.epam.gym.model.TrainingTypeName;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
-import org.hibernate.Session;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
@@ -24,26 +23,28 @@ public class TrainingTypeDaoImpl implements TrainingTypeDao {
 
     @Override
     public Optional<TrainingType> findByName(TrainingTypeName name) {
-        TrainingType result = entityManager.unwrap(Session.class)
+        Optional<TrainingType> result = entityManager
                 .createQuery("FROM TrainingType t WHERE t.trainingTypeName = :name", TrainingType.class)
                 .setParameter("name", name)
-                .uniqueResult();
-        log.debug("findByName({}) -> found={}", name, result != null);
-        return Optional.ofNullable(result);
+                .getResultList()
+                .stream()
+                .findFirst();
+        log.debug("findByName({}) -> found={}", name, result.isPresent());
+        return result;
     }
 
     @Override
     public List<TrainingType> findAll() {
-        List<TrainingType> result = entityManager.unwrap(Session.class)
+        List<TrainingType> result = entityManager
                 .createQuery("FROM TrainingType", TrainingType.class)
-                .list();
+                .getResultList();
         log.debug("findAll trainingTypes -> count={}", result.size());
         return result;
     }
 
     @Override
     public TrainingType save(TrainingType trainingType) {
-        entityManager.unwrap(Session.class).persist(trainingType);
+        entityManager.persist(trainingType);
         log.debug("Saved trainingType={}", trainingType.getTrainingTypeName());
         return trainingType;
     }
