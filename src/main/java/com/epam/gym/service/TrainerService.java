@@ -7,6 +7,7 @@ import com.epam.gym.dto.response.TrainerProfileResponse;
 import com.epam.gym.dto.response.TrainerShortResponse;
 import com.epam.gym.exception.EntityNotFoundException;
 import com.epam.gym.mapper.TrainerMapper;
+import com.epam.gym.model.Role;
 import com.epam.gym.model.Trainer;
 import com.epam.gym.model.TrainingType;
 import com.epam.gym.model.TrainingTypeName;
@@ -90,6 +91,7 @@ public class TrainerService {
                 .lastName(lastName)
                 .username(usernameGenerator.generate(firstName, lastName))
                 .password(passwordEncoder.encode(rawPassword))
+                .role(Role.TRAINER)
                 .isActive(true)
                 .build();
 

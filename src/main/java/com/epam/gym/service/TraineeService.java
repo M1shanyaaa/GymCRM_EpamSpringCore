@@ -5,6 +5,7 @@ import com.epam.gym.dto.response.CredentialsResponse;
 import com.epam.gym.dto.response.TraineeProfileResponse;
 import com.epam.gym.exception.EntityNotFoundException;
 import com.epam.gym.mapper.TraineeMapper;
+import com.epam.gym.model.Role;
 import com.epam.gym.model.Trainee;
 import com.epam.gym.model.User;
 import com.epam.gym.util.PasswordGenerator;
@@ -77,6 +78,7 @@ public class TraineeService {
                 .lastName(lastName)
                 .username(usernameGenerator.generate(firstName, lastName))
                 .password(passwordEncoder.encode(rawPassword))
+                .role(Role.TRAINEE)
                 .isActive(true)
                 .build();
 

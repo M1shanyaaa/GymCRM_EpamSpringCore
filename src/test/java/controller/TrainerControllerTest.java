@@ -7,7 +7,6 @@ import com.epam.gym.exception.EntityNotFoundException;
 import com.epam.gym.exception.GlobalExceptionHandler;
 import com.epam.gym.filter.TransactionLoggingFilter;
 import com.epam.gym.model.TrainingTypeName;
-import com.epam.gym.security.AuthenticationInterceptor;
 import com.epam.gym.service.AuthService;
 import com.epam.gym.service.TrainerService;
 import com.epam.gym.service.TrainingService;

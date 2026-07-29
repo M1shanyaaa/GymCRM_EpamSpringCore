@@ -2,7 +2,6 @@ package com.epam.gym.controller;
 
 import com.epam.gym.dto.request.AddTrainingRequest;
 import com.epam.gym.dto.response.TrainingTypeResponse;
-import com.epam.gym.security.NoAuth;
 import com.epam.gym.service.TrainingService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -33,33 +32,34 @@ public class TrainingController {
 
     // ---------- Endpoint 14: Add training ----------
     @PostMapping
-    @NoAuth
     @Operation(summary = "Add a new training session",
-            description = "Creates a new training record associating a trainee and a trainer.")
+            description = "Creates a new training record associating a trainee and a trainer. Requires JWT authentication.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Training added successfully"),
             @ApiResponse(responseCode = "400", description = "Validation error"),
-            @ApiResponse(responseCode = "401", description = "Invalid credentials"),
+            @ApiResponse(responseCode = "401", description = "Unauthenticated"),
+            @ApiResponse(responseCode = "403", description = "Forbidden access"),
             @ApiResponse(responseCode = "404", description = "Trainer or Trainee not found")
     })
     public ResponseEntity<Void> addTraining(@Valid @RequestBody AddTrainingRequest request) {
         log.info("POST /api/trainings — add training '{}'", request.trainingName());
+
+        // Removed request.username() and request.password()
         trainingService.addTraining(
-                request.username(),
-                request.password(),
                 request.traineeUsername(),
                 request.trainerUsername(),
                 request.trainingName(),
                 request.trainingDate(),
-                request.trainingDuration());
+                request.trainingDuration()
+        );
+
         return ResponseEntity.ok().build();
     }
 
     // ---------- Endpoint 17: Get training types ----------
     @GetMapping("/types")
-    @NoAuth
     @Operation(summary = "Get all training types",
-            description = "Returns a constant list of all available training types in the system. No authentication required.")
+            description = "Returns a constant list of all available training types in the system. Public endpoint.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "List of training types returned")
     })

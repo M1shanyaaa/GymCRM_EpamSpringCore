@@ -28,18 +28,7 @@ import io.micrometer.core.instrument.Timer;
 
 /**
  * Business logic for Training sessions and training types.
- * <p>
- * All methods except {@link #addTraining} and {@link #getTrainingTypes} are
- * reached only via routes authenticated globally by
- * {@code AuthenticationInterceptor}, so they no longer need to call
- * {@link AuthService} themselves.
- * <p>
- * {@link #addTraining} is the one remaining exception: its controller
- * endpoint is still marked {@code @NoAuth} because it authenticates using
- * credentials from the request body instead of {@code X-Auth-*} headers
- * (legacy behavior, tracked as a TODO). It therefore still performs its own
- * explicit authentication call below. Once that endpoint is migrated to
- * header-based auth, remove {@code authService} usage here too.
+ * Security is handled globally by Spring Security via JWT filters.
  */
 @Service
 public class TrainingService {
@@ -50,7 +39,6 @@ public class TrainingService {
     private final TraineeDao traineeDao;
     private final TrainerDao trainerDao;
     private final TrainingTypeDao trainingTypeDao;
-    private final AuthService authService;
     private final TrainingMapper trainingMapper;
     private final TrainerMapper trainerMapper;
     private final Timer searchTimer;
@@ -60,7 +48,6 @@ public class TrainingService {
                            TraineeDao traineeDao,
                            TrainerDao trainerDao,
                            TrainingTypeDao trainingTypeDao,
-                           AuthService authService,
                            TrainingMapper trainingMapper,
                            TrainerMapper trainerMapper,
                            MeterRegistry meterRegistry) {
@@ -68,7 +55,6 @@ public class TrainingService {
         this.traineeDao = traineeDao;
         this.trainerDao = trainerDao;
         this.trainingTypeDao = trainingTypeDao;
-        this.authService = authService;
         this.trainingMapper = trainingMapper;
         this.trainerMapper = trainerMapper;
         this.searchTimer = Timer.builder("gym.training.search.time")
@@ -77,15 +63,11 @@ public class TrainingService {
     }
 
     // ---------- Endpoint 14: Add training ----------
-    // NOTE: controller endpoint is @NoAuth (credentials come from the request
-    // body, not headers — see TrainingController), so this is the only
-    // remaining place in this service that must authenticate explicitly.
     @Transactional
-    public void addTraining(String callerUsername, String callerPassword,
-                            String traineeUsername, String trainerUsername,
+    public void addTraining(String traineeUsername, String trainerUsername,
                             String trainingName, LocalDate trainingDate,
                             Integer trainingDuration) {
-        authService.authenticate(callerUsername, callerPassword);
+
         validateTrainingFields(trainingName, trainingDate, trainingDuration);
 
         Trainee trainee = traineeDao.findByUsername(traineeUsername)
@@ -163,7 +145,7 @@ public class TrainingService {
         return trainerMapper.toShortList(List.copyOf(updated.getTrainers()));
     }
 
-    // ---------- Endpoint 17: Get training types (public, no auth) ----------
+    // ---------- Endpoint 17: Get training types ----------
     @Transactional(readOnly = true)
     public List<TrainingTypeResponse> getTrainingTypes() {
         List<TrainingType> types = trainingTypeDao.findAll();
