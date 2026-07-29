@@ -12,17 +12,22 @@ import com.epam.gym.model.Trainer;
 import com.epam.gym.model.TrainingType;
 import com.epam.gym.model.TrainingTypeName;
 import com.epam.gym.model.User;
+import com.epam.gym.security.CustomUserDetails;
+import com.epam.gym.security.JwtService;
 import com.epam.gym.util.PasswordGenerator;
 import com.epam.gym.util.UsernameGenerator;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.Collections;
 import java.util.List;
 
 import io.micrometer.core.instrument.Counter;
@@ -32,12 +37,11 @@ import io.micrometer.core.instrument.MeterRegistry;
  * Business logic for Trainer entities.
  * <p>
  * Authentication for every method below except {@link #create} is enforced
- * globally by {@code AuthenticationInterceptor} before the request ever
- * reaches this service. This service therefore has no dependency on
- * {@link AuthService}.
+ * globally by Spring Security (JWT filters) before the request ever
+ * reaches this service. This service therefore has no dependency on AuthService.
  * <p>
- * Password changes are handled exclusively by {@link AuthService#changePassword}
- * (see {@code AuthController}) — do not duplicate that logic here.
+ * Password changes are handled exclusively by AuthService (see AuthController)
+ * — do not duplicate that logic here.
  */
 @Service
 public class TrainerService {
@@ -50,6 +54,7 @@ public class TrainerService {
     private final PasswordGenerator passwordGenerator;
     private final PasswordEncoder passwordEncoder;
     private final TrainerMapper trainerMapper;
+    private final JwtService jwtService;
     private final Counter registrationCounter;
 
     @Autowired
@@ -59,6 +64,7 @@ public class TrainerService {
                           PasswordGenerator passwordGenerator,
                           PasswordEncoder passwordEncoder,
                           TrainerMapper trainerMapper,
+                          JwtService jwtService,
                           MeterRegistry meterRegistry) {
         this.trainerDao = trainerDao;
         this.trainingTypeDao = trainingTypeDao;
@@ -66,6 +72,7 @@ public class TrainerService {
         this.passwordGenerator = passwordGenerator;
         this.passwordEncoder = passwordEncoder;
         this.trainerMapper = trainerMapper;
+        this.jwtService = jwtService;
         this.registrationCounter = Counter.builder("gym.trainer.registrations.total")
                 .description("Total number of registered trainers")
                 .register(meterRegistry);
@@ -106,7 +113,13 @@ public class TrainerService {
 
         registrationCounter.increment();
 
-        return new CredentialsResponse(saved.getUser().getUsername(), rawPassword);
+        // Wrap the saved user in CustomUserDetails to generate a JWT token immediately
+        SimpleGrantedAuthority authority = new SimpleGrantedAuthority("ROLE_" + saved.getUser().getRole().name());
+        UserDetails userDetails = new CustomUserDetails(saved.getUser(), Collections.singletonList(authority));
+        String token = jwtService.generateToken(userDetails);
+
+        // Return credentials alongside the generated JWT
+        return new CredentialsResponse(saved.getUser().getUsername(), rawPassword, token);
     }
 
     // ---------- Endpoint 8: Get Trainer profile ----------
@@ -116,7 +129,7 @@ public class TrainerService {
         return trainerMapper.toProfile(trainer);
     }
 
-    // ---------- Endpoint 9: Update Trainer profile (specialization is read-only) ----------
+    // ---------- Endpoint 9: Update Trainer profile ----------
     @Transactional
     public TrainerProfileResponse update(String username,
                                          String firstName, String lastName,
@@ -127,7 +140,6 @@ public class TrainerService {
         trainer.getUser().setFirstName(firstName);
         trainer.getUser().setLastName(lastName);
         trainer.getUser().setActive(isActive);
-        // specialization intentionally NOT modified (read-only per spec)
 
         Trainer updated = trainerDao.update(trainer);
         log.info("Updated trainer profile '{}'", username);
