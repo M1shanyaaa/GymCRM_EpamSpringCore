@@ -11,4 +11,6 @@ public interface UserDao {
     boolean existsByUsername(String username);
 
     User update(User user);
+
+    long countAll();
 }

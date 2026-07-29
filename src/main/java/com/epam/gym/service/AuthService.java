@@ -4,12 +4,15 @@ import com.epam.gym.dao.UserDao;
 import com.epam.gym.exception.AuthenticationException;
 import com.epam.gym.exception.EntityNotFoundException;
 import com.epam.gym.model.User;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import io.micrometer.core.instrument.MeterRegistry;
 
 @Service
 public class AuthService {
@@ -18,11 +21,13 @@ public class AuthService {
 
     private final UserDao userDao;
     private final PasswordEncoder passwordEncoder;
+    private final MeterRegistry meterRegistry;
 
     @Autowired
-    public AuthService(UserDao userDao, PasswordEncoder passwordEncoder) {
+    public AuthService(UserDao userDao, PasswordEncoder passwordEncoder, MeterRegistry meterRegistry) {
         this.userDao = userDao;
         this.passwordEncoder = passwordEncoder;
+        this.meterRegistry = meterRegistry;
     }
 
     @Transactional(readOnly = true)
@@ -43,8 +48,10 @@ public class AuthService {
     public void authenticate(String username, String rawPassword) {
         if (!matches(username, rawPassword)) {
             log.warn("Authentication failed for user '{}'", username);
+            meterRegistry.counter("gym.auth.login.total", "status", "failure").increment();
             throw new AuthenticationException("Invalid username or password");
         }
+        meterRegistry.counter("gym.auth.login.total", "status", "success").increment();
         log.debug("User '{}' authenticated successfully", username);
     }
 

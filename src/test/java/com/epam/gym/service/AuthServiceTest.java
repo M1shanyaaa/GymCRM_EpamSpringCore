@@ -1,0 +1,128 @@
+package com.epam.gym.service;
+
+import com.epam.gym.dao.UserDao;
+import com.epam.gym.exception.AuthenticationException;
+import com.epam.gym.model.User;
+
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.Spy;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class AuthServiceTest {
+
+    @Mock
+    private UserDao userDao;
+
+    @Mock
+    private PasswordEncoder passwordEncoder;
+
+    @Spy
+    private MeterRegistry meterRegistry = new SimpleMeterRegistry();
+
+    @InjectMocks
+    private AuthService authService;
+
+    private User user;
+
+    @BeforeEach
+    void setUp() {
+        user = User.builder()
+                .username("John.Smith")
+                .password("hashed")
+                .isActive(true)
+                .build();
+    }
+
+    @Test
+    void matches_shouldReturnTrue_whenCredentialsValid() {
+        when(userDao.findByUsername("John.Smith")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("raw", "hashed")).thenReturn(true);
+
+        assertThat(authService.matches("John.Smith", "raw")).isTrue();
+    }
+
+    @Test
+    void matches_shouldReturnFalse_whenPasswordWrong() {
+        when(userDao.findByUsername("John.Smith")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("wrong", "hashed")).thenReturn(false);
+
+        assertThat(authService.matches("John.Smith", "wrong")).isFalse();
+    }
+
+    @Test
+    void matches_shouldReturnFalse_whenUserNotFound() {
+        when(userDao.findByUsername("Ghost")).thenReturn(Optional.empty());
+        assertThat(authService.matches("Ghost", "raw")).isFalse();
+    }
+
+    @Test
+    void matches_shouldReturnFalse_whenUsernameNull() {
+        assertThat(authService.matches(null, "raw")).isFalse();
+    }
+
+    @Test
+    void matches_shouldReturnFalse_whenPasswordNull() {
+        assertThat(authService.matches("John.Smith", null)).isFalse();
+    }
+
+    @Test
+    void authenticate_shouldPass_whenCredentialsValid() {
+        when(userDao.findByUsername("John.Smith")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("raw", "hashed")).thenReturn(true);
+
+        authService.authenticate("John.Smith", "raw"); // should not throw
+
+        assertThat(meterRegistry.counter("gym.auth.login.total", "status", "success").count())
+                .isEqualTo(1.0);
+    }
+
+    @Test
+    void authenticate_shouldThrow_whenCredentialsInvalid() {
+        when(userDao.findByUsername("John.Smith")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("bad", "hashed")).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.authenticate("John.Smith", "bad"))
+                .isInstanceOf(AuthenticationException.class)
+                .hasMessageContaining("Invalid username or password");
+
+        assertThat(meterRegistry.counter("gym.auth.login.total", "status", "failure").count())
+                .isEqualTo(1.0);
+    }
+
+    @Test
+    void changePassword_shouldEncodeAndSave_whenOldValid() {
+        when(userDao.findByUsername("John.Smith")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("raw", "hashed")).thenReturn(true);
+        when(passwordEncoder.encode("newRaw")).thenReturn("newHashed");
+
+        authService.changePassword("John.Smith", "raw", "newRaw");
+
+        assertThat(user.getPassword()).isEqualTo("newHashed");
+        verify(userDao).update(user);
+    }
+
+    @Test
+    void changePassword_shouldThrow_whenOldPasswordWrong() {
+        when(userDao.findByUsername("John.Smith")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("wrong", "hashed")).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.changePassword("John.Smith", "wrong", "newRaw"))
+                .isInstanceOf(AuthenticationException.class);
+        verify(userDao, never()).update(any());
+    }
+}

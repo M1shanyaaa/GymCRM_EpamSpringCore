@@ -1,0 +1,3 @@
+CREATE DATABASE gym_dev;
+CREATE DATABASE gym_stg;
+CREATE DATABASE gym_prod;

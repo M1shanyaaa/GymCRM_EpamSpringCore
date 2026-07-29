@@ -2,13 +2,13 @@ package com.epam.gym.dao.impl;
 
 import com.epam.gym.dao.TrainingDao;
 import com.epam.gym.model.*;
+
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.criteria.*;
-import org.hibernate.Session;
-import org.hibernate.SessionFactory;
-import org.hibernate.Transaction;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
@@ -20,31 +20,25 @@ public class TrainingDaoImpl implements TrainingDao {
 
     private static final Logger log = LoggerFactory.getLogger(TrainingDaoImpl.class);
 
-    private final SessionFactory sessionFactory;
-
-    @Autowired
-    public TrainingDaoImpl(SessionFactory sessionFactory) {
-        this.sessionFactory = sessionFactory;
-    }
+    @PersistenceContext
+    private EntityManager entityManager;
 
     // ---------- Add training (Function 16) ----------
     @Override
     public Training save(Training training) {
-        sessionFactory.getCurrentSession().persist(training);
+        entityManager.persist(training);
         log.debug("Persisted training with id={}", training.getId());
         return training;
     }
 
     // ---------- Trainee trainings by criteria (Function 14) ----------
-    // Demonstrates the type-safe Criteria API with dynamic filters.
     @Override
     public List<Training> findTraineeTrainings(String traineeUsername,
                                                LocalDate fromDate,
                                                LocalDate toDate,
                                                String trainerName,
                                                TrainingTypeName trainingType) {
-        Session session = sessionFactory.getCurrentSession();
-        CriteriaBuilder cb = session.getCriteriaBuilder();
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
         CriteriaQuery<Training> query = cb.createQuery(Training.class);
         Root<Training> root = query.from(Training.class);
 
@@ -75,14 +69,13 @@ public class TrainingDaoImpl implements TrainingDao {
 
         query.select(root).where(predicates.toArray(new Predicate[0]));
 
-        List<Training> result = session.createQuery(query).list();
+        List<Training> result = entityManager.createQuery(query).getResultList();
         log.debug("findTraineeTrainings(user={}, from={}, to={}, trainer={}, type={}) -> count={}",
                 traineeUsername, fromDate, toDate, trainerName, trainingType, result.size());
         return result;
     }
 
     // ---------- Trainer trainings by criteria (Function 15) ----------
-    // Demonstrates dynamic HQL string building with optional filters.
     @Override
     public List<Training> findTrainerTrainings(String trainerUsername,
                                                LocalDate fromDate,
@@ -104,8 +97,7 @@ public class TrainingDaoImpl implements TrainingDao {
             hql.append(" AND teu.firstName = :traineeName");
         }
 
-        var query = sessionFactory.getCurrentSession()
-                .createQuery(hql.toString(), Training.class)
+        var query = entityManager.createQuery(hql.toString(), Training.class)
                 .setParameter("trainerUsername", trainerUsername);
 
         if (fromDate != null) {
@@ -118,7 +110,7 @@ public class TrainingDaoImpl implements TrainingDao {
             query.setParameter("traineeName", traineeName);
         }
 
-        List<Training> result = query.list();
+        List<Training> result = query.getResultList();
         log.debug("findTrainerTrainings(user={}, from={}, to={}, trainee={}) -> count={}",
                 trainerUsername, fromDate, toDate, traineeName, result.size());
         return result;

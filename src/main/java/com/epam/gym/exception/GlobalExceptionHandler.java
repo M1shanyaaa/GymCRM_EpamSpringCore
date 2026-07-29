@@ -1,6 +1,7 @@
 package com.epam.gym.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -61,6 +62,12 @@ public class GlobalExceptionHandler {
                                                               HttpServletRequest request) {
         log.warn("Malformed request body: {}", ex.getMessage());
         return build(HttpStatus.BAD_REQUEST, "Malformed JSON request body", request);
+    }
+
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleConflict(Exception ex, HttpServletRequest request) {
+        log.warn("Data conflict: {}", ex.getMessage());
+        return build(HttpStatus.CONFLICT, "Database conflict: data already exists or constraint violated", request);
     }
 
     // 500 — fallback for anything unexpected

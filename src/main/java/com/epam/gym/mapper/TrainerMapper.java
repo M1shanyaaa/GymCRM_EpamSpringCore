@@ -5,6 +5,7 @@ import com.epam.gym.dto.response.TrainerProfileResponse;
 import com.epam.gym.dto.response.TrainerShortResponse;
 import com.epam.gym.model.Trainee;
 import com.epam.gym.model.Trainer;
+
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
