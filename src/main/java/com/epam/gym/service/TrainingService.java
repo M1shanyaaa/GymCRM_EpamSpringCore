@@ -7,7 +7,7 @@ import com.epam.gym.dao.TrainingTypeDao;
 import com.epam.gym.dto.response.TrainerShortResponse;
 import com.epam.gym.dto.response.TrainingResponse;
 import com.epam.gym.dto.response.TrainingTypeResponse;
-import com.epam.gym.exception.EntityNotFoundException;
+import com.epam.gym.exception.custom.EntityNotFoundException;
 import com.epam.gym.mapper.TrainerMapper;
 import com.epam.gym.mapper.TrainingMapper;
 import com.epam.gym.model.*;

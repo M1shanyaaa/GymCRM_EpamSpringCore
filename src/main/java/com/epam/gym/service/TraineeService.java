@@ -3,7 +3,7 @@ package com.epam.gym.service;
 import com.epam.gym.dao.TraineeDao;
 import com.epam.gym.dto.response.CredentialsResponse;
 import com.epam.gym.dto.response.TraineeProfileResponse;
-import com.epam.gym.exception.EntityNotFoundException;
+import com.epam.gym.exception.custom.EntityNotFoundException;
 import com.epam.gym.mapper.TraineeMapper;
 import com.epam.gym.model.Role;
 import com.epam.gym.model.Trainee;
