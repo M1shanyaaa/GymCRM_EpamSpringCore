@@ -3,7 +3,6 @@ package com.epam.gym.controller;
 import com.epam.gym.dto.request.ChangePasswordRequest;
 import com.epam.gym.dto.request.LoginRequest;
 import com.epam.gym.dto.response.JwtResponse;
-import com.epam.gym.security.NoAuth;
 import com.epam.gym.security.TokenBlacklistService;
 import com.epam.gym.service.AuthService;
 
@@ -37,7 +36,6 @@ public class AuthController {
 
     // ---------- Endpoint 3: Login (POST) ----------
     @PostMapping("/login")
-    @NoAuth
     @Operation(summary = "User login",
             description = "Authenticates user using credentials and returns a JWT token.")
     @ApiResponses({
