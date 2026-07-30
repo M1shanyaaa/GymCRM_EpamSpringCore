@@ -104,7 +104,7 @@ public class TransactionLoggingFilter implements Filter {
     }
 
     private String maskSensitiveData(String payload) {
-        String regex = "(?i)(\"([^\"]*password[^\"]*)\"\\s*:\\s*\")([^\"]+)(\")";
+        String regex = "(?i)(\"([^\"]*(password|secret|token|key|jwt)[^\"]*)\"\\s*:\\s*\")([^\"]+)(\")";
         return payload.replaceAll(regex, "$1****$4");
     }
 }
