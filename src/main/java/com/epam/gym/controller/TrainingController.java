@@ -1,5 +1,6 @@
 package com.epam.gym.controller;
 
+import com.epam.gym.config.OpenApiConfig;
 import com.epam.gym.dto.request.AddTrainingRequest;
 import com.epam.gym.dto.response.TrainingTypeResponse;
 import com.epam.gym.service.TrainingService;
@@ -7,18 +8,21 @@ import com.epam.gym.service.TrainingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/trainings")
+@SecurityRequirement(name = OpenApiConfig.AUTH_PASSWORD_SCHEME)
 @Tag(name = "Training", description = "Training session and type management endpoints")
 public class TrainingController {
 
@@ -32,6 +36,7 @@ public class TrainingController {
 
     // ---------- Endpoint 14: Add training ----------
     @PostMapping
+    @PreAuthorize("#request.traineeUsername() == authentication.name")
     @Operation(summary = "Add a new training session",
             description = "Creates a new training record associating a trainee and a trainer. Requires JWT authentication.")
     @ApiResponses({
