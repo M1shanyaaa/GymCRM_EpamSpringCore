@@ -74,6 +74,16 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.CONFLICT, "Database conflict: data already exists or constraint violated", request);
     }
 
+    // 403 — Access Denied (from @PreAuthorize)
+    @ExceptionHandler({
+            org.springframework.security.access.AccessDeniedException.class,
+            org.springframework.security.authorization.AuthorizationDeniedException.class
+    })
+    public ResponseEntity<ErrorResponse> handleAccessDenied(Exception ex, HttpServletRequest request) {
+        log.warn("Access denied (Method Security): {}", ex.getMessage());
+        return build(HttpStatus.FORBIDDEN, "Access Denied: You don't have permission to access this resource", request);
+    }
+
     // 423 — account is temporarily locked (Brute Force protection)
     @ExceptionHandler(UserLockedException.class)
     public ResponseEntity<ErrorResponse> handleLocked(UserLockedException ex,
