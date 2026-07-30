@@ -40,7 +40,7 @@ class AuthControllerTest {
     private TokenBlacklistService tokenBlacklistService;
 
     @MockBean
-    private JwtService jwtService; // Виправлення IllegalArgumentDecode
+    private JwtService jwtService;
 
     // ---------- login (POST) ----------
 

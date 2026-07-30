@@ -109,7 +109,6 @@ class TrainerServiceTest {
         assertThat(result.password()).isEqualTo("rawPass");
         assertThat(result.token()).isEqualTo("mock.jwt.token");
 
-        // ПЕРЕВІРКА МЕТРИКИ: реєстрація trainer +1
         assertThat(meterRegistry.counter("gym.trainer.registrations.total").count()).isEqualTo(1.0);
     }
 

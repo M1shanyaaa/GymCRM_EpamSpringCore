@@ -101,7 +101,6 @@ class TraineeServiceTest {
         assertThat(result.username()).isEqualTo("John.Smith");
         assertThat(result.token()).isEqualTo("mock.jwt.token");
 
-        // ПЕРЕВІРКА МЕТРИКИ: реєстрація trainee +1
         assertThat(meterRegistry.counter("gym.trainee.registrations.total").count()).isEqualTo(1.0);
     }
 
