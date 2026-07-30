@@ -11,12 +11,6 @@ import java.time.LocalDate;
  */
 public record AddTrainingRequest(
 
-        @NotBlank(message = "Username is required")
-        String username,
-
-        @NotBlank(message = "Password is required")
-        String password,
-
         @NotBlank(message = "Trainee username is required")
         String traineeUsername,
 
