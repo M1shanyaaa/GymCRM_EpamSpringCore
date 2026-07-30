@@ -14,7 +14,6 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-
 @DataJpaTest
 @Import(TraineeDaoImpl.class)
 class TraineeDaoITest {
@@ -31,6 +30,7 @@ class TraineeDaoITest {
                 .lastName("Smith")
                 .username(username)
                 .password("hashed")
+                .role(Role.TRAINEE) // ДОДАНО РОЛЬ
                 .isActive(true)
                 .build();
         return Trainee.builder()
@@ -90,19 +90,22 @@ class TraineeDaoITest {
 
     @Test
     void delete_shouldCascadeRemoveUserAndTrainings() {
-        // Arrange: persist full graph with TestEntityManager
         TrainingType type = new TrainingType(TrainingTypeName.STRENGTH);
         entityManager.persist(type);
 
         User traineeUser = User.builder()
                 .firstName("John").lastName("Smith")
-                .username("John.Smith").password("hash").isActive(true).build();
+                .username("John.Smith").password("hash")
+                .role(Role.TRAINEE)
+                .isActive(true).build();
         Trainee trainee = Trainee.builder().user(traineeUser).build();
         entityManager.persist(trainee);
 
         User trainerUser = User.builder()
                 .firstName("Bruce").lastName("Wayne")
-                .username("Bruce.Wayne").password("hash").isActive(true).build();
+                .username("Bruce.Wayne").password("hash")
+                .role(Role.TRAINER)
+                .isActive(true).build();
         Trainer trainer = Trainer.builder().user(trainerUser).specialization(type).build();
         entityManager.persist(trainer);
 
@@ -112,33 +115,23 @@ class TraineeDaoITest {
                 .trainingDate(LocalDate.now()).trainingDuration(45).build();
         entityManager.persist(training);
 
-        // Flush changes to the DB
         entityManager.flush();
 
         Long userId = traineeUser.getId();
         Long trainingId = training.getId();
         Long traineeId = trainee.getId();
 
-        // FIX: Clear the first-level cache (memory).
-        // This forces Hibernate to fetch the Trainee anew, along with its trainings collection.
         entityManager.clear();
 
-        // Act
-        // Load a fresh Trainee object from the database
         Trainee managedTrainee = entityManager.find(Trainee.class, traineeId);
-
-        // Now Hibernate sees the trainings and will generate the correct cascading DELETE queries
         traineeDao.delete(managedTrainee);
 
         entityManager.flush();
         entityManager.clear();
 
-        // Assert: cascade removed user + training, trainee gone
         assertThat(entityManager.find(Trainee.class, traineeId)).isNull();
         assertThat(entityManager.find(User.class, userId)).isNull();
         assertThat(entityManager.find(Training.class, trainingId)).isNull();
-
-        // trainer + trainerUser MUST survive (not cascaded)
         assertThat(entityManager.find(Trainer.class, trainer.getId())).isNotNull();
     }
 }
