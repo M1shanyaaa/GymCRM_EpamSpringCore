@@ -31,13 +31,11 @@ public class TransactionLoggingFilter implements Filter {
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
             throws IOException, ServletException {
 
-        if (!(request instanceof HttpServletRequest) || !(response instanceof HttpServletResponse)) {
+        if (!(request instanceof HttpServletRequest req) || !(response instanceof HttpServletResponse res)) {
             chain.doFilter(request, response);
             return;
         }
 
-        HttpServletRequest req = (HttpServletRequest) request;
-        HttpServletResponse res = (HttpServletResponse) response;
         String uri = req.getRequestURI();
         if (uri.startsWith("/actuator") || uri.startsWith("/swagger") || uri.startsWith("/v3/api-docs")) {
             chain.doFilter(request, response);
@@ -55,8 +53,8 @@ public class TransactionLoggingFilter implements Filter {
         long startTime = System.currentTimeMillis();
 
         try {
-            log.info("--> Incoming Request: method={} uri={}", req.getMethod(), req.getRequestURI());
-
+            String safeUri = maskSensitiveUri(req.getRequestURI(), req.getQueryString());
+            log.info("--> Incoming Request: method={} uri={}", req.getMethod(), safeUri);
             // Pass the request further along the chain
             chain.doFilter(wrappedRequest, wrappedResponse);
 
@@ -83,11 +81,11 @@ public class TransactionLoggingFilter implements Filter {
                 }
             }
 
-            // IMPORTANT: Copy the response body back so the client receives it
+            // Copy the response body back so the client receives it
             wrappedResponse.copyBodyToResponse();
 
             // Clear MDC to prevent memory leaks in thread pools
-            MDC.remove(TRANSACTION_ID_KEY);
+            MDC.clear();
         }
     }
 
@@ -106,5 +104,13 @@ public class TransactionLoggingFilter implements Filter {
     private String maskSensitiveData(String payload) {
         String regex = "(?i)(\"([^\"]*(password|secret|token|key|jwt)[^\"]*)\"\\s*:\\s*\")([^\"]+)(\")";
         return payload.replaceAll(regex, "$1****$4");
+    }
+
+    private String maskSensitiveUri(String requestURI, String queryString) {
+        if (queryString == null || queryString.isEmpty()) {
+            return requestURI;
+        }
+        String maskedQuery = queryString.replaceAll("(?i)(token|secret|password|key|jwt)=([^&]+)", "$1=****");
+        return requestURI + "?" + maskedQuery;
     }
 }
