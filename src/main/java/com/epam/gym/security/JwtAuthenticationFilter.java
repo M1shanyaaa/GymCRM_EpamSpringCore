@@ -1,5 +1,6 @@
 package com.epam.gym.security;
 
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -55,6 +56,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
+        try {
         // 3. Extract username from token
         username = jwtService.extractUsername(jwt);
 
@@ -73,6 +75,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 // Set the user in the context so controllers can access it
                 SecurityContextHolder.getContext().setAuthentication(authToken);
             }
+        }
+        } catch (JwtException e) {
+            // CRITICAL FIX: Catch expired or malformed token exceptions
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            return;
         }
 
         filterChain.doFilter(request, response);
