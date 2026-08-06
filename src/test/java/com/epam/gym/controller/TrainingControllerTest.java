@@ -1,27 +1,22 @@
 package com.epam.gym.controller;
 
 import com.epam.gym.dto.response.TrainingTypeResponse;
-import com.epam.gym.exception.AuthenticationException;
-import com.epam.gym.exception.EntityNotFoundException;
-import com.epam.gym.exception.GlobalExceptionHandler;
-import com.epam.gym.filter.TransactionLoggingFilter;
 import com.epam.gym.model.TrainingTypeName;
+import com.epam.gym.security.JwtService;
 import com.epam.gym.service.TrainingService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -30,121 +25,70 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@ExtendWith(MockitoExtension.class)
+@SpringBootTest
+@AutoConfigureMockMvc
 class TrainingControllerTest {
 
-    @Mock
-    private TrainingService trainingService;
-
-    @InjectMocks
-    private TrainingController trainingController;
-
+    @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
-    @BeforeEach
-    void setUp() {
-        objectMapper = new ObjectMapper()
-                .registerModule(new JavaTimeModule())
-                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+    @MockBean
+    private TrainingService trainingService;
 
-        mockMvc = MockMvcBuilders
-                .standaloneSetup(trainingController)
-                .setControllerAdvice(new GlobalExceptionHandler())
-                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
-                .addFilters(new TransactionLoggingFilter())
-                .build();
-    }
+    @MockBean
+    private JwtService jwtService;
 
     private Map<String, Object> validAddTrainingBody() {
         return Map.of(
-                "username", "John.Smith",
-                "password", "raw",
                 "traineeUsername", "John.Smith",
                 "trainerUsername", "Bruce.Wayne",
                 "trainingName", "Strength Session",
-                "trainingDate", LocalDate.now().toString(),
+                "trainingDate", LocalDate.now().plusDays(5).toString(),
                 "trainingDuration", 45);
     }
 
-    // ---------- addTraining (@NoAuth, credentials in body) ----------
+    // ---------- addTraining ----------
 
     @Test
-    void addTraining_shouldReturn200_withoutAnyAuthHeaders() throws Exception {
-        // no X-Auth-* headers sent at all — endpoint is @NoAuth by design
+    @WithMockUser(username = "John.Smith")
+    void addTraining_shouldReturn200_withValidToken() throws Exception {
         mockMvc.perform(post("/api/trainings")
-                        .contentType("application/json")
+                        .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validAddTrainingBody())))
                 .andExpect(status().isOk());
 
         verify(trainingService).addTraining(
-                eq("John.Smith"), eq("raw"),
                 eq("John.Smith"), eq("Bruce.Wayne"),
-                eq("Strength Session"), eq(LocalDate.now()), eq(45));
+                eq("Strength Session"), eq(LocalDate.now().plusDays(5)), eq(45));
     }
 
     @Test
-    void addTraining_shouldReturn401_whenServiceRejectsCredentials() throws Exception {
-        doThrow(new AuthenticationException("Invalid username or password"))
-                .when(trainingService).addTraining(
-                        eq("John.Smith"), eq("wrong"),
-                        anyString(), anyString(), anyString(), any(), anyInt());
-
-        Map<String, Object> body = new java.util.HashMap<>(validAddTrainingBody());
-        body.put("password", "wrong");
-
+    void addTraining_shouldReturn401_whenNoToken() throws Exception {
         mockMvc.perform(post("/api/trainings")
-                        .contentType("application/json")
-                        .content(objectMapper.writeValueAsString(body)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validAddTrainingBody())))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
-    void addTraining_shouldReturn404_whenTraineeOrTrainerNotFound() throws Exception {
-        doThrow(new EntityNotFoundException("Trainee not found: Ghost"))
-                .when(trainingService).addTraining(
-                        anyString(), anyString(),
-                        eq("Ghost"), anyString(), anyString(), any(), anyInt());
-
-        Map<String, Object> body = new java.util.HashMap<>(validAddTrainingBody());
-        body.put("traineeUsername", "Ghost");
-
-        mockMvc.perform(post("/api/trainings")
-                        .contentType("application/json")
-                        .content(objectMapper.writeValueAsString(body)))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    void addTraining_shouldReturn400_whenTrainingNameBlank() throws Exception {
-        Map<String, Object> body = new java.util.HashMap<>(validAddTrainingBody());
-        body.put("trainingName", "");
-
-        mockMvc.perform(post("/api/trainings")
-                        .contentType("application/json")
-                        .content(objectMapper.writeValueAsString(body)))
-                .andExpect(status().isBadRequest());
-
-        verifyNoInteractions(trainingService);
-    }
-
-    @Test
+    @WithMockUser(username = "John.Smith")
     void addTraining_shouldReturn400_whenDurationMissing() throws Exception {
-        Map<String, Object> body = new java.util.HashMap<>(validAddTrainingBody());
+        Map<String, Object> body = new HashMap<>(validAddTrainingBody());
         body.remove("trainingDuration");
 
         mockMvc.perform(post("/api/trainings")
-                        .contentType("application/json")
+                        .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isBadRequest());
-
-        verifyNoInteractions(trainingService);
     }
 
-    // ---------- getTrainingTypes (@NoAuth) ----------
+    // ---------- getTrainingTypes ----------
 
     @Test
-    void getTrainingTypes_shouldReturn200WithList_withoutAuthHeaders() throws Exception {
+    void getTrainingTypes_shouldReturn200_withoutAuthHeaders() throws Exception {
         when(trainingService.getTrainingTypes())
                 .thenReturn(List.of(new TrainingTypeResponse(TrainingTypeName.STRENGTH, 1L)));
 

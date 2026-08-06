@@ -22,9 +22,8 @@ class TrainingDaoITest {
     private TrainingDao trainingDao;
 
     @Autowired
-    private TestEntityManager entityManager; // Fully replaces Hibernate Session in tests
+    private TestEntityManager entityManager;
 
-    // Helper: create full object graph inside the current test transaction
     private Training persistFullTraining(TestEntityManager entityManager,
                                          String traineeUsername,
                                          String trainerFirstName,
@@ -33,7 +32,6 @@ class TrainingDaoITest {
                                          TrainingTypeName typeName,
                                          String trainingName) {
 
-        // 1. Find or create TrainingType
         List<TrainingType> types = entityManager.getEntityManager()
                 .createQuery("from TrainingType where trainingTypeName = :name", TrainingType.class)
                 .setParameter("name", typeName)
@@ -45,7 +43,6 @@ class TrainingDaoITest {
             entityManager.persist(type);
         }
 
-        // 2. Find or create Trainee
         List<Trainee> trainees = entityManager.getEntityManager()
                 .createQuery("from Trainee where user.username = :username", Trainee.class)
                 .setParameter("username", traineeUsername)
@@ -55,13 +52,14 @@ class TrainingDaoITest {
         if (trainee == null) {
             User traineeUser = User.builder()
                     .firstName(traineeFirstName).lastName("Smith")
-                    .username(traineeUsername).password("hashed").isActive(true)
+                    .username(traineeUsername).password("hashed")
+                    .role(Role.TRAINEE)
+                    .isActive(true)
                     .build();
             trainee = Trainee.builder().user(traineeUser).build();
             entityManager.persist(trainee);
         }
 
-        // 3. Find or create Trainer
         String trainerUsername = trainerFirstName + ".Wayne";
         List<Trainer> trainers = entityManager.getEntityManager()
                 .createQuery("from Trainer where user.username = :username", Trainer.class)
@@ -72,14 +70,15 @@ class TrainingDaoITest {
         if (trainer == null) {
             User trainerUser = User.builder()
                     .firstName(trainerFirstName).lastName("Wayne")
-                    .username(trainerUsername).password("hashed").isActive(true)
+                    .username(trainerUsername).password("hashed")
+                    .role(Role.TRAINER)
+                    .isActive(true)
                     .build();
             trainer = Trainer.builder()
                     .user(trainerUser).specialization(type).build();
             entityManager.persist(trainer);
         }
 
-        // 4. Create the training session itself
         Training training = Training.builder()
                 .trainee(trainee)
                 .trainer(trainer)
@@ -90,12 +89,10 @@ class TrainingDaoITest {
                 .build();
 
         entityManager.persist(training);
-        entityManager.flush(); // Force flush to the database
+        entityManager.flush();
 
         return training;
     }
-
-    // ---------- findTraineeTrainings ----------
 
     @Test
     void findTraineeTrainings_shouldReturnAll_whenNoFilters() {
@@ -156,8 +153,6 @@ class TrainingDaoITest {
         assertThat(trainingDao.findTraineeTrainings(
                 "Ghost", null, null, null, null)).isEmpty();
     }
-
-    // ---------- findTrainerTrainings ----------
 
     @Test
     void findTrainerTrainings_shouldReturnAll_whenNoFilters() {

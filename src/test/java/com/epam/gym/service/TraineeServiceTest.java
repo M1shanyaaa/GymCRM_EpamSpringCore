@@ -3,10 +3,11 @@ package com.epam.gym.service;
 import com.epam.gym.dao.TraineeDao;
 import com.epam.gym.dto.response.CredentialsResponse;
 import com.epam.gym.dto.response.TraineeProfileResponse;
-import com.epam.gym.exception.EntityNotFoundException;
+import com.epam.gym.exception.custom.EntityNotFoundException;
 import com.epam.gym.mapper.TraineeMapper;
 import com.epam.gym.model.Trainee;
 import com.epam.gym.model.User;
+import com.epam.gym.security.JwtService;
 import com.epam.gym.util.PasswordGenerator;
 import com.epam.gym.util.UsernameGenerator;
 
@@ -21,6 +22,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
@@ -45,6 +47,8 @@ class TraineeServiceTest {
     private PasswordEncoder passwordEncoder;
     @Mock
     private TraineeMapper traineeMapper;
+    @Mock
+    private JwtService jwtService;
 
     @Spy
     private MeterRegistry meterRegistry = new SimpleMeterRegistry();
@@ -84,6 +88,7 @@ class TraineeServiceTest {
         when(passwordGenerator.generate()).thenReturn("rawPass");
         when(passwordEncoder.encode("rawPass")).thenReturn("hashed");
         when(traineeDao.save(any(Trainee.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(jwtService.generateToken(any(UserDetails.class))).thenReturn("mock.jwt.token");
 
         CredentialsResponse result = traineeService.create("John", "Smith",
                 LocalDate.of(1990, 1, 1), "Kyiv");
@@ -94,8 +99,8 @@ class TraineeServiceTest {
 
         assertThat(saved.getUser().getUsername()).isEqualTo("John.Smith");
         assertThat(result.username()).isEqualTo("John.Smith");
+        assertThat(result.token()).isEqualTo("mock.jwt.token");
 
-        // ПЕРЕВІРКА МЕТРИКИ: реєстрація trainee +1
         assertThat(meterRegistry.counter("gym.trainee.registrations.total").count()).isEqualTo(1.0);
     }
 

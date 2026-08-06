@@ -7,8 +7,7 @@ import com.epam.gym.dao.TrainingTypeDao;
 import com.epam.gym.dto.response.TrainerShortResponse;
 import com.epam.gym.dto.response.TrainingResponse;
 import com.epam.gym.dto.response.TrainingTypeResponse;
-import com.epam.gym.exception.AuthenticationException;
-import com.epam.gym.exception.EntityNotFoundException;
+import com.epam.gym.exception.custom.EntityNotFoundException;
 import com.epam.gym.mapper.TrainerMapper;
 import com.epam.gym.mapper.TrainingMapper;
 import com.epam.gym.model.*;
@@ -47,8 +46,6 @@ class TrainingServiceTest {
     private TrainerDao trainerDao;
     @Mock
     private TrainingTypeDao trainingTypeDao;
-    @Mock
-    private AuthService authService;
     @Mock
     private TrainingMapper trainingMapper;
     @Mock
@@ -96,7 +93,6 @@ class TrainingServiceTest {
         when(trainingDao.save(any(Training.class))).thenAnswer(inv -> inv.getArgument(0));
 
         trainingService.addTraining(
-                "John.Smith", "raw",
                 "John.Smith", "Bruce.Wayne",
                 "Strength Session", LocalDate.now(), 45);
 
@@ -106,33 +102,38 @@ class TrainingServiceTest {
 
         assertThat(saved.getTrainee()).isSameAs(trainee);
         assertThat(saved.getTrainer()).isSameAs(trainer);
-        verify(authService).authenticate("John.Smith", "raw");
-    }
-
-    @Test
-    void addTraining_shouldThrow_whenAuthFails() {
-        doThrow(new AuthenticationException("bad"))
-                .when(authService).authenticate("John.Smith", "wrong");
-
-        assertThatThrownBy(() -> trainingService.addTraining(
-                "John.Smith", "wrong", "John.Smith", "Bruce.Wayne",
-                "Session", LocalDate.now(), 30))
-                .isInstanceOf(AuthenticationException.class);
+        // Ensure relation is built
+        assertThat(trainee.getTrainers()).contains(trainer);
+        verify(traineeDao).update(trainee);
     }
 
     @Test
     void addTraining_shouldThrow_whenTraineeNotFound() {
         when(traineeDao.findByUsername("Ghost")).thenReturn(Optional.empty());
+
         assertThatThrownBy(() -> trainingService.addTraining(
-                "John.Smith", "raw", "Ghost", "Bruce.Wayne",
+                "Ghost", "Bruce.Wayne",
                 "Session", LocalDate.now(), 30))
-                .isInstanceOf(EntityNotFoundException.class);
+                .isInstanceOf(EntityNotFoundException.class)
+                .hasMessageContaining("Trainee not found");
+    }
+
+    @Test
+    void addTraining_shouldThrow_whenTrainerNotFound() {
+        when(traineeDao.findByUsername("John.Smith")).thenReturn(Optional.of(trainee));
+        when(trainerDao.findByUsername("GhostTrainer")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> trainingService.addTraining(
+                "John.Smith", "GhostTrainer",
+                "Session", LocalDate.now(), 30))
+                .isInstanceOf(EntityNotFoundException.class)
+                .hasMessageContaining("Trainer not found");
     }
 
     @Test
     void addTraining_shouldThrow_whenNameBlank() {
         assertThatThrownBy(() -> trainingService.addTraining(
-                "John.Smith", "raw", "John.Smith", "Bruce.Wayne",
+                "John.Smith", "Bruce.Wayne",
                 " ", LocalDate.now(), 30))
                 .isInstanceOf(IllegalArgumentException.class);
     }
@@ -144,6 +145,7 @@ class TrainingServiceTest {
         List<Training> entities = List.of(new Training());
         List<TrainingResponse> mapped = List.of(new TrainingResponse(
                 "S", LocalDate.now(), TrainingTypeName.STRENGTH, 45, "Bruce", "John"));
+
         when(trainingDao.findTraineeTrainings("John.Smith", null, null, null, null))
                 .thenReturn(entities);
         when(trainingMapper.toResponseList(entities)).thenReturn(mapped);
@@ -152,8 +154,6 @@ class TrainingServiceTest {
                 "John.Smith", null, null, null, null);
 
         assertThat(result).isEqualTo(mapped);
-
-        // ПЕРЕВІРКА МЕТРИКИ: виклик timer.record() +1
         assertThat(meterRegistry.timer("gym.training.search.time").count()).isEqualTo(1L);
     }
 
@@ -164,6 +164,7 @@ class TrainingServiceTest {
         List<Training> entities = List.of(new Training());
         List<TrainingResponse> mapped = List.of(new TrainingResponse(
                 "S", LocalDate.now(), TrainingTypeName.STRENGTH, 45, "Bruce", "John"));
+
         when(trainingDao.findTrainerTrainings("Bruce.Wayne", null, null, null))
                 .thenReturn(entities);
         when(trainingMapper.toResponseList(entities)).thenReturn(mapped);
@@ -172,8 +173,6 @@ class TrainingServiceTest {
                 "Bruce.Wayne", null, null, null);
 
         assertThat(result).isEqualTo(mapped);
-
-        // ПЕРЕВІРКА МЕТРИКИ: виклик timer.record() +1
         assertThat(meterRegistry.timer("gym.training.search.time").count()).isEqualTo(1L);
     }
 

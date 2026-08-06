@@ -2,6 +2,7 @@ package com.epam.gym.dao;
 
 import com.epam.gym.dao.impl.TraineeDaoImpl;
 import com.epam.gym.dao.impl.UserDaoImpl;
+import com.epam.gym.model.Role;
 import com.epam.gym.model.Trainee;
 import com.epam.gym.model.User;
 
@@ -24,7 +25,9 @@ class UserDaoITest {
     private void persistTraineeWithUsername(String username) {
         User user = User.builder()
                 .firstName("John").lastName("Smith")
-                .username(username).password("hashed").isActive(true)
+                .username(username).password("hashed")
+                .role(Role.TRAINEE)
+                .isActive(true)
                 .build();
         traineeDao.save(Trainee.builder().user(user).build());
     }
@@ -52,8 +55,6 @@ class UserDaoITest {
     void existsByUsername_shouldReturnFalse_whenMissing() {
         assertThat(userDao.existsByUsername("Ghost")).isFalse();
     }
-
-    // ---------- new tests for countAll ----------
 
     @Test
     void countAll_shouldReturnTotalNumberOfUsers() {

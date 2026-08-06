@@ -10,7 +10,6 @@ import com.epam.gym.dto.response.TraineeProfileResponse;
 import com.epam.gym.dto.response.TrainerShortResponse;
 import com.epam.gym.dto.response.TrainingResponse;
 import com.epam.gym.model.TrainingTypeName;
-import com.epam.gym.security.NoAuth;
 import com.epam.gym.service.TraineeService;
 import com.epam.gym.service.TrainingService;
 
@@ -26,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -47,11 +47,10 @@ public class TraineeController {
         this.trainingService = trainingService;
     }
 
-    // ---------- Endpoint 1: Register trainee (no auth) ----------
+    // ---------- Endpoint 1: Register trainee ----------
     @PostMapping
-    @NoAuth
     @Operation(summary = "Register a new trainee",
-            description = "Creates a trainee profile; username and password are auto-generated. No authentication required.",
+            description = "Creates a trainee profile; username and password are auto-generated. Public endpoint.",
             security = {})
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Trainee registered, credentials returned"),
@@ -69,11 +68,13 @@ public class TraineeController {
 
     // ---------- Endpoint 5: Get trainee profile ----------
     @GetMapping("/{username}")
+    @PreAuthorize("#username == authentication.name")
     @Operation(summary = "Get trainee profile",
-            description = "Returns the trainee's profile including assigned trainers. Requires password confirmation for the given username.")
+            description = "Returns the trainee's profile. JWT required. User can only access their own profile.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Profile returned"),
-            @ApiResponse(responseCode = "401", description = "Invalid credentials"),
+            @ApiResponse(responseCode = "401", description = "Unauthenticated"),
+            @ApiResponse(responseCode = "403", description = "Forbidden access (wrong user)"),
             @ApiResponse(responseCode = "404", description = "Trainee not found")
     })
     public ResponseEntity<TraineeProfileResponse> getProfile(
@@ -85,13 +86,13 @@ public class TraineeController {
 
     // ---------- Endpoint 6: Update trainee profile ----------
     @PutMapping("/{username}")
+    @PreAuthorize("#username == authentication.name")
     @Operation(summary = "Update trainee profile",
-            description = "Updates the trainee's profile. Username cannot be changed.")
+            description = "Updates the trainee's profile. User can only update their own profile.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Profile updated"),
             @ApiResponse(responseCode = "400", description = "Validation error"),
-            @ApiResponse(responseCode = "401", description = "Invalid credentials"),
-            @ApiResponse(responseCode = "404", description = "Trainee not found")
+            @ApiResponse(responseCode = "403", description = "Forbidden access (wrong user)")
     })
     public ResponseEntity<TraineeProfileResponse> update(
             @Parameter(description = "Trainee username") @PathVariable String username,
@@ -106,13 +107,9 @@ public class TraineeController {
 
     // ---------- Endpoint 7: Delete trainee ----------
     @DeleteMapping("/{username}")
+    @PreAuthorize("#username == authentication.name")
     @Operation(summary = "Delete trainee profile",
-            description = "Hard-deletes the trainee and cascades deletion of related trainings.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Trainee deleted"),
-            @ApiResponse(responseCode = "401", description = "Invalid credentials"),
-            @ApiResponse(responseCode = "404", description = "Trainee not found")
-    })
+            description = "Hard-deletes the trainee. User can only delete their own profile.")
     public ResponseEntity<Void> delete(
             @Parameter(description = "Trainee username") @PathVariable String username) {
         log.info("DELETE /api/trainees/{}", username);
@@ -122,14 +119,9 @@ public class TraineeController {
 
     // ---------- Endpoint 15: Activate / deactivate ----------
     @PatchMapping("/{username}/status")
+    @PreAuthorize("#username == authentication.name")
     @Operation(summary = "Activate/deactivate trainee",
-            description = "Changes the trainee's active status. Not idempotent.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Status changed"),
-            @ApiResponse(responseCode = "400", description = "Validation error"),
-            @ApiResponse(responseCode = "401", description = "Invalid credentials"),
-            @ApiResponse(responseCode = "404", description = "Trainee not found")
-    })
+            description = "Changes the trainee's active status.")
     public ResponseEntity<Void> setActive(
             @Parameter(description = "Trainee username") @PathVariable String username,
             @Valid @RequestBody ActivateRequest request) {
@@ -140,14 +132,8 @@ public class TraineeController {
 
     // ---------- Endpoint 11: Update trainee's trainers list ----------
     @PutMapping("/{username}/trainers")
-    @Operation(summary = "Update trainee's trainers list",
-            description = "Replaces the trainee's list of assigned trainers.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Trainers list updated"),
-            @ApiResponse(responseCode = "400", description = "Validation error"),
-            @ApiResponse(responseCode = "401", description = "Invalid credentials"),
-            @ApiResponse(responseCode = "404", description = "Trainee or trainer not found")
-    })
+    @PreAuthorize("#username == authentication.name")
+    @Operation(summary = "Update trainee's trainers list")
     public ResponseEntity<List<TrainerShortResponse>> updateTrainers(
             @Parameter(description = "Trainee username") @PathVariable String username,
             @Valid @RequestBody UpdateTraineeTrainersRequest request) {
@@ -159,19 +145,14 @@ public class TraineeController {
 
     // ---------- Endpoint 12: Get trainee trainings ----------
     @GetMapping("/{username}/trainings")
-    @Operation(summary = "Get trainee trainings",
-            description = "Returns the trainee's trainings with optional filters by date, trainer, and training type.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Trainings returned"),
-            @ApiResponse(responseCode = "401", description = "Invalid credentials"),
-            @ApiResponse(responseCode = "404", description = "Trainee not found")
-    })
+    @PreAuthorize("#username == authentication.name")
+    @Operation(summary = "Get trainee trainings")
     public ResponseEntity<List<TrainingResponse>> getTrainings(
             @Parameter(description = "Trainee username") @PathVariable String username,
-            @Parameter(description = "Period from (yyyy-MM-dd)") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @Parameter(description = "Period to (yyyy-MM-dd)") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @Parameter(description = "Filter by trainer name") @RequestParam(required = false) String trainerName,
-            @Parameter(description = "Filter by training type") @RequestParam(required = false) TrainingTypeName trainingType) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String trainerName,
+            @RequestParam(required = false) TrainingTypeName trainingType) {
         log.info("GET /api/trainees/{}/trainings", username);
         List<TrainingResponse> trainings = trainingService.getTraineeTrainings(
                 username, from, to, trainerName, trainingType);

@@ -39,7 +39,9 @@ class TrainerDaoITest {
     private Trainer newTrainer(String username, TrainingType type) {
         User user = User.builder()
                 .firstName("Bruce").lastName("Wayne")
-                .username(username).password("hashed").isActive(true)
+                .username(username).password("hashed")
+                .role(Role.TRAINER)
+                .isActive(true)
                 .build();
         return Trainer.builder().user(user).specialization(type).build();
     }
@@ -107,10 +109,11 @@ class TrainerDaoITest {
         Trainer assigned = trainerDao.save(newTrainer("Assigned.Trainer", type));
         Trainer free = trainerDao.save(newTrainer("Free.Trainer", type));
 
-        // create trainee linked to 'assigned'
         User traineeUser = User.builder()
                 .firstName("John").lastName("Smith")
-                .username("John.Smith").password("hashed").isActive(true)
+                .username("John.Smith").password("hashed")
+                .role(Role.TRAINEE)
+                .isActive(true)
                 .build();
         Trainee trainee = Trainee.builder().user(traineeUser).build();
         trainee.getTrainers().add(assigned);

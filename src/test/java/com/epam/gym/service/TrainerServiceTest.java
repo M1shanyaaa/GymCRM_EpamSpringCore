@@ -5,12 +5,13 @@ import com.epam.gym.dao.TrainingTypeDao;
 import com.epam.gym.dto.response.CredentialsResponse;
 import com.epam.gym.dto.response.TrainerProfileResponse;
 import com.epam.gym.dto.response.TrainerShortResponse;
-import com.epam.gym.exception.EntityNotFoundException;
+import com.epam.gym.exception.custom.EntityNotFoundException;
 import com.epam.gym.mapper.TrainerMapper;
 import com.epam.gym.model.Trainer;
 import com.epam.gym.model.TrainingType;
 import com.epam.gym.model.TrainingTypeName;
 import com.epam.gym.model.User;
+import com.epam.gym.security.JwtService;
 import com.epam.gym.util.PasswordGenerator;
 import com.epam.gym.util.UsernameGenerator;
 
@@ -25,6 +26,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
@@ -50,6 +52,8 @@ class TrainerServiceTest {
     private PasswordEncoder passwordEncoder;
     @Mock
     private TrainerMapper trainerMapper;
+    @Mock
+    private JwtService jwtService;
 
     @Spy
     private MeterRegistry meterRegistry = new SimpleMeterRegistry();
@@ -93,6 +97,7 @@ class TrainerServiceTest {
         when(passwordGenerator.generate()).thenReturn("rawPass");
         when(passwordEncoder.encode("rawPass")).thenReturn("hashed");
         when(trainerDao.save(any(Trainer.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(jwtService.generateToken(any(UserDetails.class))).thenReturn("mock.jwt.token");
 
         CredentialsResponse result = trainerService.create("Bruce", "Wayne", TrainingTypeName.STRENGTH);
 
@@ -102,8 +107,8 @@ class TrainerServiceTest {
 
         assertThat(saved.getUser().getUsername()).isEqualTo("Bruce.Wayne");
         assertThat(result.password()).isEqualTo("rawPass");
+        assertThat(result.token()).isEqualTo("mock.jwt.token");
 
-        // ПЕРЕВІРКА МЕТРИКИ: реєстрація trainer +1
         assertThat(meterRegistry.counter("gym.trainer.registrations.total").count()).isEqualTo(1.0);
     }
 
