@@ -37,6 +37,7 @@
     <modules>
         <module>gym-main-service</module>
         <module>eureka-server</module>
+        <module>trainer-workload-service</module>
     </modules>
 
     <!-- ===================== DEPENDENCY MANAGEMENT ===================== -->
