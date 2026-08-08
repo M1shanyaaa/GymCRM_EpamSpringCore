@@ -26,7 +26,6 @@ public class WorkloadController {
                 request.getActionType(), request.getTrainerUsername());
 
         workloadService.processWorkload(request);
-
         return ResponseEntity.ok().build();
     }
 
@@ -34,12 +33,7 @@ public class WorkloadController {
     public ResponseEntity<TrainerWorkloadResponse> getWorkloadSummary(@PathVariable String username) {
         log.info("Received request to get workload summary for trainer: {}", username);
 
-        try {
-            TrainerWorkloadResponse summary = workloadService.getSummary(username);
-            return ResponseEntity.ok(summary);
-        } catch (IllegalArgumentException e) {
-            log.warn(e.getMessage());
-            return ResponseEntity.notFound().build();
-        }
+        TrainerWorkloadResponse summary = workloadService.getSummary(username);
+        return ResponseEntity.ok(summary);
     }
 }

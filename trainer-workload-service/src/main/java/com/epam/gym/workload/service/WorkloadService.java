@@ -62,7 +62,7 @@ public class WorkloadService {
     public TrainerWorkloadResponse getSummary(String username) {
         TrainerData trainerData = storage.get(username);
         if (trainerData == null) {
-            throw new IllegalArgumentException("Trainer workload not found for: " + username);
+            throw new com.epam.gym.workload.exception.WorkloadNotFoundException("Trainer workload not found for: " + username);
         }
 
         TrainerWorkloadResponse response = new TrainerWorkloadResponse();
