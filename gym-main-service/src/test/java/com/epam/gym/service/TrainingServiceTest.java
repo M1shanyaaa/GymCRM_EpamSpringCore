@@ -1,5 +1,6 @@
 package com.epam.gym.service;
 
+import com.epam.gym.client.WorkloadClient;
 import com.epam.gym.dao.TraineeDao;
 import com.epam.gym.dao.TrainerDao;
 import com.epam.gym.dao.TrainingDao;
@@ -12,6 +13,7 @@ import com.epam.gym.mapper.TrainerMapper;
 import com.epam.gym.mapper.TrainingMapper;
 import com.epam.gym.model.*;
 
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
@@ -19,9 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
@@ -38,23 +38,15 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class TrainingServiceTest {
 
-    @Mock
-    private TrainingDao trainingDao;
-    @Mock
-    private TraineeDao traineeDao;
-    @Mock
-    private TrainerDao trainerDao;
-    @Mock
-    private TrainingTypeDao trainingTypeDao;
-    @Mock
-    private TrainingMapper trainingMapper;
-    @Mock
-    private TrainerMapper trainerMapper;
+    @Mock private TrainingDao trainingDao;
+    @Mock private TraineeDao traineeDao;
+    @Mock private TrainerDao trainerDao;
+    @Mock private TrainingTypeDao trainingTypeDao;
+    @Mock private TrainingMapper trainingMapper;
+    @Mock private TrainerMapper trainerMapper;
+    @Mock private WorkloadClient workloadClient;
 
-    @Spy
-    private MeterRegistry meterRegistry = new SimpleMeterRegistry();
-
-    @InjectMocks
+    private MeterRegistry meterRegistry;
     private TrainingService trainingService;
 
     private Trainee trainee;
@@ -63,6 +55,15 @@ class TrainingServiceTest {
 
     @BeforeEach
     void setUp() {
+        meterRegistry = new SimpleMeterRegistry();
+
+        // Реальний registry (робочий, не мок) — щоб circuitBreaker(...) повертав живий об'єкт
+        trainingService = new TrainingService(
+                trainingDao, traineeDao, trainerDao, trainingTypeDao,
+                trainingMapper, trainerMapper, workloadClient,
+                CircuitBreakerRegistry.ofDefaults(),
+                meterRegistry);
+
         strengthType = new TrainingType(TrainingTypeName.STRENGTH);
 
         User traineeUser = User.builder()
@@ -102,9 +103,29 @@ class TrainingServiceTest {
 
         assertThat(saved.getTrainee()).isSameAs(trainee);
         assertThat(saved.getTrainer()).isSameAs(trainer);
-        // Ensure relation is built
         assertThat(trainee.getTrainers()).contains(trainer);
         verify(traineeDao).update(trainee);
+
+        // workload-клієнт має бути викликаний
+        verify(workloadClient).updateWorkload(any());
+    }
+
+    @Test
+    void addTraining_whenWorkloadClientFails_fallbackPreventsException() {
+        when(traineeDao.findByUsername("John.Smith")).thenReturn(Optional.of(trainee));
+        when(trainerDao.findByUsername("Bruce.Wayne")).thenReturn(Optional.of(trainer));
+        when(trainingDao.save(any(Training.class))).thenAnswer(inv -> inv.getArgument(0));
+        // симулюємо падіння downstream-сервісу
+        doThrow(new RuntimeException("workload down"))
+                .when(workloadClient).updateWorkload(any());
+
+        // fallback (catch) не дає прокинути виняток — тренування все одно збережене
+        trainingService.addTraining(
+                "John.Smith", "Bruce.Wayne",
+                "Strength Session", LocalDate.now(), 45);
+
+        verify(trainingDao).save(any(Training.class));
+        verify(workloadClient).updateWorkload(any());
     }
 
     @Test
