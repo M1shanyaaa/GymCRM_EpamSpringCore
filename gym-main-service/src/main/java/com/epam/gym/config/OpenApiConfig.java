@@ -3,6 +3,7 @@ package com.epam.gym.config;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,15 +12,9 @@ import org.springframework.context.annotation.Configuration;
 public class OpenApiConfig {
 
     /**
-     * Name of the security scheme documenting the {@code X-Auth-Password}
-     * header required by authenticated endpoints. Applied selectively via
-     * {@code @SecurityRequirement(name = OpenApiConfig.AUTH_PASSWORD_SCHEME)}
-     * on controller classes whose endpoints require it — intentionally NOT
-     * set globally, since public/{@code @NoAuth} endpoints (registration,
-     * login, addTraining, getTrainingTypes) must not advertise an auth
-     * requirement they don't actually have.
+     * Name of the security scheme documenting the JWT Authorization header.
      */
-    public static final String AUTH_PASSWORD_SCHEME = "AuthPassword";
+    public static final String BEARER_AUTH_SCHEME = "BearerAuth";
 
     @Bean
     public OpenAPI gymOpenAPI() {
@@ -27,15 +22,19 @@ public class OpenApiConfig {
                 .info(new Info()
                         .title("Gym CRM REST API")
                         .version("1.0")
-                        .description("Spring MVC Gym CRM — trainees, trainers, trainings"))
+                        .description("Spring MVC Gym CRM — trainees, trainers, trainings with JWT Security"))
+                // 1. Apply the security requirement globally to all endpoints.
+                // (Endpoints explicitly ignoring security can still bypass this via Spring Security config).
+                .addSecurityItem(new SecurityRequirement().addList(BEARER_AUTH_SCHEME))
+
+                // 2. Define the security scheme as HTTP Bearer.
                 .components(new Components()
-                        .addSecuritySchemes(AUTH_PASSWORD_SCHEME,
+                        .addSecuritySchemes(BEARER_AUTH_SCHEME,
                                 new SecurityScheme()
-                                        .type(SecurityScheme.Type.APIKEY)
-                                        .in(SecurityScheme.In.HEADER)
-                                        .name("X-Auth-Password")
-                                        .description("Password of the user identified by the {username} path "
-                                                + "variable. Verified globally by AuthenticationInterceptor "
-                                                + "before the request reaches the controller.")));
+                                        .name(BEARER_AUTH_SCHEME)
+                                        .type(SecurityScheme.Type.HTTP)
+                                        .scheme("bearer")
+                                        .bearerFormat("JWT")
+                                        .description("Enter your bare JWT token here. Swagger will automatically prepend 'Bearer '.")));
     }
 }

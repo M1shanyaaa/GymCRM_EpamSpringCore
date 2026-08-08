@@ -34,7 +34,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/trainers")
 @Tag(name = "Trainer", description = "Trainer management endpoints")
-@SecurityRequirement(name = OpenApiConfig.AUTH_PASSWORD_SCHEME)
 public class TrainerController {
 
     private static final Logger log = LoggerFactory.getLogger(TrainerController.class);

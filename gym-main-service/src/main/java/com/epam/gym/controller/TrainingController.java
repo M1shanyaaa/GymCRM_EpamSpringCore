@@ -22,7 +22,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/trainings")
-@SecurityRequirement(name = OpenApiConfig.AUTH_PASSWORD_SCHEME)
 @Tag(name = "Training", description = "Training session and type management endpoints")
 public class TrainingController {
 
