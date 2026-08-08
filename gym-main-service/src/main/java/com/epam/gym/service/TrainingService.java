@@ -1,9 +1,12 @@
 package com.epam.gym.service;
 
+import com.epam.gym.client.WorkloadClient;
 import com.epam.gym.dao.TraineeDao;
 import com.epam.gym.dao.TrainerDao;
 import com.epam.gym.dao.TrainingDao;
 import com.epam.gym.dao.TrainingTypeDao;
+import com.epam.gym.dto.client.ActionType;
+import com.epam.gym.dto.client.WorkloadRequest;
 import com.epam.gym.dto.response.TrainerShortResponse;
 import com.epam.gym.dto.response.TrainingResponse;
 import com.epam.gym.dto.response.TrainingTypeResponse;
@@ -41,6 +44,7 @@ public class TrainingService {
     private final TrainingTypeDao trainingTypeDao;
     private final TrainingMapper trainingMapper;
     private final TrainerMapper trainerMapper;
+    private final WorkloadClient workloadClient;
     private final Timer searchTimer;
 
     @Autowired
@@ -50,6 +54,7 @@ public class TrainingService {
                            TrainingTypeDao trainingTypeDao,
                            TrainingMapper trainingMapper,
                            TrainerMapper trainerMapper,
+                           WorkloadClient workloadClient,
                            MeterRegistry meterRegistry) {
         this.trainingDao = trainingDao;
         this.traineeDao = traineeDao;
@@ -57,6 +62,7 @@ public class TrainingService {
         this.trainingTypeDao = trainingTypeDao;
         this.trainingMapper = trainingMapper;
         this.trainerMapper = trainerMapper;
+        this.workloadClient = workloadClient;
         this.searchTimer = Timer.builder("gym.training.search.time")
                 .description("Time taken to fetch trainings by criteria")
                 .register(meterRegistry);
@@ -93,6 +99,20 @@ public class TrainingService {
         trainingDao.save(training);
         log.info("Added training '{}' (trainee='{}', trainer='{}', date={})",
                 trainingName, traineeUsername, trainerUsername, trainingDate);
+
+        // Send ADD event to workload microservice
+        WorkloadRequest workloadRequest = WorkloadRequest.builder()
+                .trainerUsername(trainer.getUser().getUsername())
+                .trainerFirstName(trainer.getUser().getFirstName())
+                .trainerLastName(trainer.getUser().getLastName())
+                .isActive(trainer.getUser().isActive())
+                .trainingDate(trainingDate)
+                .trainingDuration(trainingDuration)
+                .actionType(ActionType.ADD)
+                .build();
+
+        workloadClient.updateWorkload(workloadRequest);
+        log.debug("Sent workload ADD request for trainer '{}'", trainerUsername);
     }
 
     // ---------- Endpoint 12: Trainee trainings by criteria ----------

@@ -1,12 +1,17 @@
 package com.epam.gym.service;
 
+import com.epam.gym.client.WorkloadClient;
 import com.epam.gym.dao.TraineeDao;
+import com.epam.gym.dto.client.ActionType;
+import com.epam.gym.dto.client.WorkloadRequest;
 import com.epam.gym.dto.response.CredentialsResponse;
 import com.epam.gym.dto.response.TraineeProfileResponse;
 import com.epam.gym.exception.custom.EntityNotFoundException;
 import com.epam.gym.mapper.TraineeMapper;
 import com.epam.gym.model.Role;
 import com.epam.gym.model.Trainee;
+import com.epam.gym.model.Trainer;
+import com.epam.gym.model.Training;
 import com.epam.gym.model.User;
 import com.epam.gym.security.CustomUserDetails;
 import com.epam.gym.security.JwtService;
@@ -24,7 +29,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -50,6 +57,7 @@ public class TraineeService {
     private final PasswordEncoder passwordEncoder;
     private final TraineeMapper traineeMapper;
     private final JwtService jwtService;
+    private final WorkloadClient workloadClient;
     private final Counter registrationCounter;
 
     @Autowired
@@ -59,6 +67,7 @@ public class TraineeService {
                           PasswordEncoder passwordEncoder,
                           TraineeMapper traineeMapper,
                           JwtService jwtService,
+                          WorkloadClient workloadClient,
                           MeterRegistry meterRegistry) {
         this.traineeDao = traineeDao;
         this.usernameGenerator = usernameGenerator;
@@ -66,6 +75,7 @@ public class TraineeService {
         this.passwordEncoder = passwordEncoder;
         this.traineeMapper = traineeMapper;
         this.jwtService = jwtService;
+        this.workloadClient = workloadClient;
         this.registrationCounter = Counter.builder("gym.trainee.registrations.total")
                 .description("Total number of registered trainees")
                 .register(meterRegistry);
@@ -149,8 +159,30 @@ public class TraineeService {
     @Transactional
     public void delete(String username) {
         Trainee trainee = getTraineeOrThrow(username);
+
+        // Collect all trainings before deleting the trainee to adjust trainer workloads
+        List<Training> traineeTrainings = new ArrayList<>(trainee.getTrainings());
+
         traineeDao.delete(trainee);
         log.info("Deleted trainee profile '{}' (cascade: user + trainings)", username);
+
+        // Send DELETE events to the workload microservice for each associated training
+        for (Training training : traineeTrainings) {
+            Trainer trainer = training.getTrainer();
+            WorkloadRequest workloadRequest = WorkloadRequest.builder()
+                    .trainerUsername(trainer.getUser().getUsername())
+                    .trainerFirstName(trainer.getUser().getFirstName())
+                    .trainerLastName(trainer.getUser().getLastName())
+                    .isActive(trainer.getUser().isActive())
+                    .trainingDate(training.getTrainingDate())
+                    .trainingDuration(training.getTrainingDuration())
+                    .actionType(ActionType.DELETE)
+                    .build();
+
+            workloadClient.updateWorkload(workloadRequest);
+        }
+
+        log.debug("Sent {} workload DELETE requests for trainee '{}'", traineeTrainings.size(), username);
     }
 
     // ---------- helpers ----------
