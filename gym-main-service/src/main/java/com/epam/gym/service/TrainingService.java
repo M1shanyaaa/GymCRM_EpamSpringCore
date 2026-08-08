@@ -15,6 +15,8 @@ import com.epam.gym.mapper.TrainerMapper;
 import com.epam.gym.mapper.TrainingMapper;
 import com.epam.gym.model.*;
 
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,6 +47,7 @@ public class TrainingService {
     private final TrainingMapper trainingMapper;
     private final TrainerMapper trainerMapper;
     private final WorkloadClient workloadClient;
+    private final CircuitBreakerRegistry circuitBreakerRegistry;
     private final Timer searchTimer;
 
     @Autowired
@@ -55,6 +58,7 @@ public class TrainingService {
                            TrainingMapper trainingMapper,
                            TrainerMapper trainerMapper,
                            WorkloadClient workloadClient,
+                           CircuitBreakerRegistry circuitBreakerRegistry,
                            MeterRegistry meterRegistry) {
         this.trainingDao = trainingDao;
         this.traineeDao = traineeDao;
@@ -63,6 +67,7 @@ public class TrainingService {
         this.trainingMapper = trainingMapper;
         this.trainerMapper = trainerMapper;
         this.workloadClient = workloadClient;
+        this.circuitBreakerRegistry = circuitBreakerRegistry;
         this.searchTimer = Timer.builder("gym.training.search.time")
                 .description("Time taken to fetch trainings by criteria")
                 .register(meterRegistry);
@@ -100,7 +105,7 @@ public class TrainingService {
         log.info("Added training '{}' (trainee='{}', trainer='{}', date={})",
                 trainingName, traineeUsername, trainerUsername, trainingDate);
 
-        // Send ADD event to workload microservice
+        // Send ADD event to workload microservice protected by Circuit Breaker & Fallback
         WorkloadRequest workloadRequest = WorkloadRequest.builder()
                 .trainerUsername(trainer.getUser().getUsername())
                 .trainerFirstName(trainer.getUser().getFirstName())
@@ -111,8 +116,15 @@ public class TrainingService {
                 .actionType(ActionType.ADD)
                 .build();
 
-        workloadClient.updateWorkload(workloadRequest);
-        log.debug("Sent workload ADD request for trainer '{}'", trainerUsername);
+        CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker("workloadService");
+        try {
+            circuitBreaker.executeRunnable(() -> workloadClient.updateWorkload(workloadRequest));
+            log.debug("Sent workload ADD request for trainer '{}'", trainerUsername);
+        } catch (Exception ex) {
+            // Fallback logic: Log warning and prevent the transaction from failing
+            log.warn("FALLBACK EXECUTED: Could not update workload for trainer '{}'. Reason: {}. Training is saved in monolith, but workload sync failed.",
+                    trainerUsername, ex.getMessage());
+        }
     }
 
     // ---------- Endpoint 12: Trainee trainings by criteria ----------
