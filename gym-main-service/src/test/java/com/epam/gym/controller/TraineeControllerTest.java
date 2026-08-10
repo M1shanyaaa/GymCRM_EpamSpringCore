@@ -1,6 +1,7 @@
 package com.epam.gym.controller;
 
 import com.epam.gym.dto.response.*;
+import com.epam.gym.messaging.WorkloadMessageProducer;
 import com.epam.gym.security.JwtService;
 import com.epam.gym.service.TraineeService;
 import com.epam.gym.service.TrainingService;
@@ -27,6 +28,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 class TraineeControllerTest {
+
+    @MockBean
+    private WorkloadMessageProducer workloadMessageProducer;
 
     @Autowired
     private MockMvc mockMvc;

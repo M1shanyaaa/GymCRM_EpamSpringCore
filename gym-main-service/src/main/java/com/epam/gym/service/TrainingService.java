@@ -1,6 +1,5 @@
 package com.epam.gym.service;
 
-import com.epam.gym.client.WorkloadClient;
 import com.epam.gym.dao.TraineeDao;
 import com.epam.gym.dao.TrainerDao;
 import com.epam.gym.dao.TrainingDao;
@@ -16,7 +15,6 @@ import com.epam.gym.mapper.TrainingMapper;
 import com.epam.gym.messaging.WorkloadMessageProducer;
 import com.epam.gym.model.*;
 
-import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,7 +44,6 @@ public class TrainingService {
     private final TrainingTypeDao trainingTypeDao;
     private final TrainingMapper trainingMapper;
     private final TrainerMapper trainerMapper;
-    private final WorkloadClient workloadClient;
     private final Timer searchTimer;
     private final WorkloadMessageProducer workloadMessageProducer;
 
@@ -57,7 +54,6 @@ public class TrainingService {
                            TrainingTypeDao trainingTypeDao,
                            TrainingMapper trainingMapper,
                            TrainerMapper trainerMapper,
-                           WorkloadClient workloadClient,
                            WorkloadMessageProducer workloadMessageProducer,
                            MeterRegistry meterRegistry) {
         this.trainingDao = trainingDao;
@@ -66,7 +62,6 @@ public class TrainingService {
         this.trainingTypeDao = trainingTypeDao;
         this.trainingMapper = trainingMapper;
         this.trainerMapper = trainerMapper;
-        this.workloadClient = workloadClient;
         this.workloadMessageProducer = workloadMessageProducer;
         this.searchTimer = Timer.builder("gym.training.search.time")
                 .description("Time taken to fetch trainings by criteria")

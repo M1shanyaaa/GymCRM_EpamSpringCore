@@ -1,6 +1,5 @@
 package com.epam.gym.service;
 
-import com.epam.gym.client.WorkloadClient;
 import com.epam.gym.dao.TraineeDao;
 import com.epam.gym.dto.client.ActionType;
 import com.epam.gym.dto.client.WorkloadRequest;
@@ -8,6 +7,7 @@ import com.epam.gym.dto.response.CredentialsResponse;
 import com.epam.gym.dto.response.TraineeProfileResponse;
 import com.epam.gym.exception.custom.EntityNotFoundException;
 import com.epam.gym.mapper.TraineeMapper;
+import com.epam.gym.messaging.WorkloadMessageProducer;
 import com.epam.gym.model.Role;
 import com.epam.gym.model.Trainee;
 import com.epam.gym.model.Trainer;
@@ -45,6 +45,9 @@ import io.micrometer.core.instrument.MeterRegistry;
  * <p>
  * Password changes are handled exclusively by AuthService (see AuthController)
  * — do not duplicate that logic here.
+ * <p>
+ * Workload updates are sent asynchronously to the trainer-workload-service
+ * via ActiveMQ (see {@link WorkloadMessageProducer}).
  */
 @Service
 public class TraineeService {
@@ -57,7 +60,7 @@ public class TraineeService {
     private final PasswordEncoder passwordEncoder;
     private final TraineeMapper traineeMapper;
     private final JwtService jwtService;
-    private final WorkloadClient workloadClient;
+    private final WorkloadMessageProducer workloadMessageProducer;
     private final Counter registrationCounter;
 
     @Autowired
@@ -67,7 +70,7 @@ public class TraineeService {
                           PasswordEncoder passwordEncoder,
                           TraineeMapper traineeMapper,
                           JwtService jwtService,
-                          WorkloadClient workloadClient,
+                          WorkloadMessageProducer workloadMessageProducer,
                           MeterRegistry meterRegistry) {
         this.traineeDao = traineeDao;
         this.usernameGenerator = usernameGenerator;
@@ -75,7 +78,7 @@ public class TraineeService {
         this.passwordEncoder = passwordEncoder;
         this.traineeMapper = traineeMapper;
         this.jwtService = jwtService;
-        this.workloadClient = workloadClient;
+        this.workloadMessageProducer = workloadMessageProducer;
         this.registrationCounter = Counter.builder("gym.trainee.registrations.total")
                 .description("Total number of registered trainees")
                 .register(meterRegistry);
@@ -110,12 +113,10 @@ public class TraineeService {
 
         registrationCounter.increment();
 
-        // Wrap the saved user in CustomUserDetails to generate a JWT token immediately
         SimpleGrantedAuthority authority = new SimpleGrantedAuthority("ROLE_" + saved.getUser().getRole().name());
         UserDetails userDetails = new CustomUserDetails(saved.getUser(), Collections.singletonList(authority));
         String token = jwtService.generateToken(userDetails);
 
-        // Return credentials alongside the generated JWT
         return new CredentialsResponse(saved.getUser().getUsername(), rawPassword, token);
     }
 
@@ -166,7 +167,7 @@ public class TraineeService {
         traineeDao.delete(trainee);
         log.info("Deleted trainee profile '{}' (cascade: user + trainings)", username);
 
-        // Send DELETE events to the workload microservice for each associated training
+        // Send DELETE events to the workload microservice ASYNCHRONOUSLY via ActiveMQ
         for (Training training : traineeTrainings) {
             Trainer trainer = training.getTrainer();
             WorkloadRequest workloadRequest = WorkloadRequest.builder()
@@ -179,10 +180,11 @@ public class TraineeService {
                     .actionType(ActionType.DELETE)
                     .build();
 
-            workloadClient.updateWorkload(workloadRequest);
+            workloadMessageProducer.sendWorkload(workloadRequest);
         }
 
-        log.debug("Sent {} workload DELETE requests for trainee '{}'", traineeTrainings.size(), username);
+        log.debug("Queued {} workload DELETE messages for trainee '{}'",
+                traineeTrainings.size(), username);
     }
 
     // ---------- helpers ----------
