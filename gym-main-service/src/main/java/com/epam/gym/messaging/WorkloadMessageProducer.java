@@ -1,16 +1,23 @@
 package com.epam.gym.messaging;
 
 import com.epam.gym.dto.client.WorkloadRequest;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jms.core.JmsTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 @Component
 public class WorkloadMessageProducer {
 
     private static final Logger log = LoggerFactory.getLogger(WorkloadMessageProducer.class);
+
+    private static final String TRANSACTION_ID_KEY = "transactionId";
+    private static final String AUTHORIZATION_HEADER = "Authorization";
 
     private final JmsTemplate jmsTemplate;
     private final String workloadQueue;
@@ -22,8 +29,30 @@ public class WorkloadMessageProducer {
     }
 
     public void sendWorkload(WorkloadRequest request) {
-        jmsTemplate.convertAndSend(workloadQueue, request);
-        log.info("Sent workload message [{}] for trainer '{}' to queue '{}'",
-                request.getActionType(), request.getTrainerUsername(), workloadQueue);
+        String authHeader = extractAuthHeader();
+        String transactionId = MDC.get(TRANSACTION_ID_KEY);
+
+        jmsTemplate.convertAndSend(workloadQueue, request, message -> {
+            if (authHeader != null) {
+                message.setStringProperty(AUTHORIZATION_HEADER, authHeader);
+            }
+            if (transactionId != null) {
+                message.setStringProperty(TRANSACTION_ID_KEY, transactionId);
+            }
+            return message;
+        });
+
+        log.info("Sent workload message [{}] for trainer '{}' to queue '{}' (txId={})",
+                request.getActionType(), request.getTrainerUsername(), workloadQueue, transactionId);
+    }
+
+    private String extractAuthHeader() {
+        ServletRequestAttributes attributes =
+                (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        if (attributes != null) {
+            HttpServletRequest request = attributes.getRequest();
+            return request.getHeader(AUTHORIZATION_HEADER);
+        }
+        return null;
     }
 }
