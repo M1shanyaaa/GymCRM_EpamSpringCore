@@ -93,6 +93,11 @@
             <version>${mapstruct.version}</version>
         </dependency>
 
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-activemq</artifactId>
+        </dependency>
+
         <!-- OpenAPI -->
         <dependency>
             <groupId>org.springdoc</groupId>
