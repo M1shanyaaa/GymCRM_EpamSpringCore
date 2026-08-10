@@ -1,11 +1,14 @@
 package com.epam.gym.messaging;
 
 import com.epam.gym.dto.client.WorkloadRequest;
+
 import jakarta.servlet.http.HttpServletRequest;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jms.JmsException;
 import org.springframework.jms.core.JmsTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -32,18 +35,27 @@ public class WorkloadMessageProducer {
         String authHeader = extractAuthHeader();
         String transactionId = MDC.get(TRANSACTION_ID_KEY);
 
-        jmsTemplate.convertAndSend(workloadQueue, request, message -> {
-            if (authHeader != null) {
-                message.setStringProperty(AUTHORIZATION_HEADER, authHeader);
-            }
-            if (transactionId != null) {
-                message.setStringProperty(TRANSACTION_ID_KEY, transactionId);
-            }
-            return message;
-        });
+        try {
+            jmsTemplate.convertAndSend(workloadQueue, request, message -> {
+                if (authHeader != null) {
+                    message.setStringProperty(AUTHORIZATION_HEADER, authHeader);
+                }
+                if (transactionId != null) {
+                    message.setStringProperty(TRANSACTION_ID_KEY, transactionId);
+                }
+                return message;
+            });
 
-        log.info("Sent workload message [{}] for trainer '{}' to queue '{}' (txId={})",
-                request.getActionType(), request.getTrainerUsername(), workloadQueue, transactionId);
+            log.info("Sent workload message [{}] for trainer '{}' to queue '{}' (txId={})",
+                    request.getActionType(), request.getTrainerUsername(), workloadQueue, transactionId);
+
+        } catch (JmsException ex) {
+            log.error("CRITICAL: Failed to send workload message [{}] for trainer '{}' (txId={}). "
+                            + "Message will NOT be published. Enclosing transaction will roll back. "
+                            + "Error: {}",
+                    request.getActionType(), request.getTrainerUsername(), transactionId, ex.getMessage(), ex);
+            throw ex;  // Triggering rollback
+        }
     }
 
     private String extractAuthHeader() {

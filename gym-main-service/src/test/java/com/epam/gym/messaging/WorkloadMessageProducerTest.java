@@ -2,8 +2,10 @@ package com.epam.gym.messaging;
 
 import com.epam.gym.dto.client.ActionType;
 import com.epam.gym.dto.client.WorkloadRequest;
+
 import jakarta.jms.JMSException;
 import jakarta.jms.Message;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,13 +13,16 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.MDC;
+import org.springframework.jms.JmsException;
+import org.springframework.jms.UncategorizedJmsException;
 import org.springframework.jms.core.JmsTemplate;
 import org.springframework.jms.core.MessagePostProcessor;
 
 import java.time.LocalDate;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -26,7 +31,8 @@ class WorkloadMessageProducerTest {
 
     private static final String QUEUE = "workload.queue";
 
-    @Mock private JmsTemplate jmsTemplate;
+    @Mock
+    private JmsTemplate jmsTemplate;
 
     private WorkloadMessageProducer producer;
 
@@ -102,6 +108,41 @@ class WorkloadMessageProducerTest {
         // just ensure no exception bubbles up
         producer.sendWorkload(request);
 
+        verify(jmsTemplate, times(1))
+                .convertAndSend(eq(QUEUE), eq(request), any(MessagePostProcessor.class));
+    }
+
+    // ---------- broker failure / fallback behavior ----------
+
+    @Test
+    void sendWorkload_whenBrokerUnavailable_propagatesJmsException() {
+        producer = new WorkloadMessageProducer(jmsTemplate, QUEUE);
+        WorkloadRequest request = sampleRequest();
+
+        // simulate broker down during send
+        doThrow(new UncategorizedJmsException("Broker unavailable"))
+                .when(jmsTemplate)
+                .convertAndSend(eq(QUEUE), eq(request), any(MessagePostProcessor.class));
+
+        // exception must propagate so the enclosing @Transactional rolls back
+        assertThatThrownBy(() -> producer.sendWorkload(request))
+                .isInstanceOf(JmsException.class)
+                .hasMessageContaining("Broker unavailable");
+    }
+
+    @Test
+    void sendWorkload_whenBrokerUnavailable_attemptsSendOnce() {
+        producer = new WorkloadMessageProducer(jmsTemplate, QUEUE);
+        WorkloadRequest request = sampleRequest();
+
+        doThrow(new UncategorizedJmsException("Broker unavailable"))
+                .when(jmsTemplate)
+                .convertAndSend(anyString(), any(Object.class), any(MessagePostProcessor.class));
+
+        assertThatThrownBy(() -> producer.sendWorkload(request))
+                .isInstanceOf(JmsException.class);
+
+        // producer does NOT retry internally — a single send attempt, then propagate
         verify(jmsTemplate, times(1))
                 .convertAndSend(eq(QUEUE), eq(request), any(MessagePostProcessor.class));
     }
