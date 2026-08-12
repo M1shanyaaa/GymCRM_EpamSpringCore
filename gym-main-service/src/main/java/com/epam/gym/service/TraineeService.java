@@ -18,6 +18,8 @@ import com.epam.gym.security.JwtService;
 import com.epam.gym.util.PasswordGenerator;
 import com.epam.gym.util.UsernameGenerator;
 
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -58,6 +60,7 @@ public class TraineeService {
     private final TraineeMapper traineeMapper;
     private final JwtService jwtService;
     private final WorkloadClient workloadClient;
+    private final CircuitBreakerRegistry circuitBreakerRegistry;
     private final Counter registrationCounter;
 
     @Autowired
@@ -68,6 +71,7 @@ public class TraineeService {
                           TraineeMapper traineeMapper,
                           JwtService jwtService,
                           WorkloadClient workloadClient,
+                          CircuitBreakerRegistry circuitBreakerRegistry,
                           MeterRegistry meterRegistry) {
         this.traineeDao = traineeDao;
         this.usernameGenerator = usernameGenerator;
@@ -76,6 +80,7 @@ public class TraineeService {
         this.traineeMapper = traineeMapper;
         this.jwtService = jwtService;
         this.workloadClient = workloadClient;
+        this.circuitBreakerRegistry = circuitBreakerRegistry;
         this.registrationCounter = Counter.builder("gym.trainee.registrations.total")
                 .description("Total number of registered trainees")
                 .register(meterRegistry);
@@ -110,12 +115,10 @@ public class TraineeService {
 
         registrationCounter.increment();
 
-        // Wrap the saved user in CustomUserDetails to generate a JWT token immediately
         SimpleGrantedAuthority authority = new SimpleGrantedAuthority("ROLE_" + saved.getUser().getRole().name());
         UserDetails userDetails = new CustomUserDetails(saved.getUser(), Collections.singletonList(authority));
         String token = jwtService.generateToken(userDetails);
 
-        // Return credentials alongside the generated JWT
         return new CredentialsResponse(saved.getUser().getUsername(), rawPassword, token);
     }
 
@@ -166,6 +169,8 @@ public class TraineeService {
         traineeDao.delete(trainee);
         log.info("Deleted trainee profile '{}' (cascade: user + trainings)", username);
 
+        CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker("workloadService");
+
         // Send DELETE events to the workload microservice for each associated training
         for (Training training : traineeTrainings) {
             Trainer trainer = training.getTrainer();
@@ -179,7 +184,14 @@ public class TraineeService {
                     .actionType(ActionType.DELETE)
                     .build();
 
-            workloadClient.updateWorkload(workloadRequest);
+            // FIX
+            try {
+                circuitBreaker.executeRunnable(() -> workloadClient.updateWorkload(workloadRequest));
+                log.debug("Sent workload DELETE request for trainer '{}'", trainer.getUser().getUsername());
+            } catch (Exception ex) {
+                log.warn("FALLBACK EXECUTED: Could not update workload for trainer '{}'. Reason: {}. Trainee is deleted in monolith, but workload sync failed.",
+                        trainer.getUser().getUsername(), ex.getMessage());
+            }
         }
 
         log.debug("Sent {} workload DELETE requests for trainee '{}'", traineeTrainings.size(), username);
