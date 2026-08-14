@@ -4,12 +4,14 @@ import com.epam.gym.workload.dto.WorkloadRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.context.annotation.Profile;
 import org.springframework.jms.annotation.JmsListener;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
 
 @Component
+@Profile("!test")
 public class DeadLetterQueueListener {
 
     private static final Logger log = LoggerFactory.getLogger(DeadLetterQueueListener.class);
@@ -25,7 +27,6 @@ public class DeadLetterQueueListener {
             log.error("DEAD LETTER received. Trainer='{}', reason='{}'. Message will not be processed further.",
                     request != null ? request.getTrainerUsername() : "unknown",
                     reason != null ? reason : "unknown");
-            // Тут можна: зберегти в БД, надіслати алерт, тощо.
         } finally {
             MDC.clear();
         }
