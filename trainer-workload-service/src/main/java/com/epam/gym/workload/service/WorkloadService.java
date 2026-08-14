@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 
@@ -31,6 +32,7 @@ public class WorkloadService {
         this.mapper = mapper;
     }
 
+    @Transactional
     public void processWorkload(WorkloadRequest request) {
         String txId = MDC.get(TX_ID);
         String username = request.getTrainerUsername();
@@ -45,7 +47,9 @@ public class WorkloadService {
         TrainerWorkloadDocument document = repository.findByTrainerUsername(username)
                 .orElse(null);
 
-        if (document == null) {
+        boolean isNew = document == null;
+
+        if (isNew) {
             log.debug("[TxId: {}] No existing document for '{}', creating new", txId, username);
             document = createNewDocument(request);
         } else {
@@ -54,7 +58,11 @@ public class WorkloadService {
             document.setTrainerStatus(Boolean.TRUE.equals(request.getIsActive()));
         }
 
-        applyAction(document, year, month, duration, action, txId);
+        boolean changed = applyAction(document, year, month, duration, action, txId);
+        if (!changed && !isNew) {
+            log.info("[TxId: {}] No changes applied for trainer '{}', skipping save", txId, username);
+            return;
+        }
 
         repository.save(document);
         log.info("[TxId: {}] Saved workload document for trainer '{}'", txId, username);
@@ -70,13 +78,13 @@ public class WorkloadService {
                 .build();
     }
 
-    private void applyAction(TrainerWorkloadDocument document, int year, int month,
-                             int duration, ActionType action, String txId) {
+    private boolean applyAction(TrainerWorkloadDocument document, int year, int month,
+                                int duration, ActionType action, String txId) {
 
         YearSummary yearSummary = findOrCreateYear(document, year, action, txId);
         if (yearSummary == null) {
             log.debug("[TxId: {}] DELETE requested for missing year {}, skipping", txId, year);
-            return;
+            return false;
         }
 
         MonthSummary monthSummary = yearSummary.getMonths().stream()
@@ -95,24 +103,28 @@ public class WorkloadService {
                         txId, month, year, monthSummary.getSummaryDuration(), updated);
                 monthSummary.setSummaryDuration(updated);
             }
-        } else { // DELETE
-            if (monthSummary == null) {
-                log.debug("[TxId: {}] DELETE requested for missing month {} (year {}), skipping", txId, month, year);
-                return;
-            }
-            long updated = monthSummary.getSummaryDuration() - duration;
-            if (updated <= 0) {
-                yearSummary.getMonths().remove(monthSummary);
-                log.debug("[TxId: {}] Removed month {} (year {}) — duration dropped to {}", txId, month, year, updated);
-            } else {
-                monthSummary.setSummaryDuration(updated);
-                log.debug("[TxId: {}] Decremented month {} (year {}) to {}", txId, month, year, updated);
-            }
-            if (yearSummary.getMonths().isEmpty()) {
-                document.getYears().remove(yearSummary);
-                log.debug("[TxId: {}] Removed empty year {}", txId, year);
-            }
+            return true;
         }
+
+        if (monthSummary == null) {
+            log.debug("[TxId: {}] DELETE requested for missing month {} (year {}), skipping", txId, month, year);
+            return false;
+        }
+
+        long updated = monthSummary.getSummaryDuration() - duration;
+        if (updated <= 0) {
+            yearSummary.getMonths().remove(monthSummary);
+            log.debug("[TxId: {}] Removed month {} (year {}) — duration dropped to {}", txId, month, year, updated);
+        } else {
+            monthSummary.setSummaryDuration(updated);
+            log.debug("[TxId: {}] Decremented month {} (year {}) to {}", txId, month, year, updated);
+        }
+
+        if (yearSummary.getMonths().isEmpty()) {
+            document.getYears().remove(yearSummary);
+            log.debug("[TxId: {}] Removed empty year {}", txId, year);
+        }
+        return true;
     }
 
     private YearSummary findOrCreateYear(TrainerWorkloadDocument document, int year,

@@ -147,18 +147,41 @@ class WorkloadServiceTest {
         assertThat(saved.getYears()).isEmpty(); // month removed -> year removed
     }
 
-    // ---------- DELETE: non-existing month -> no-op ----------
+    // ---------- DELETE: non-existing month -> no-op, NO save ----------
 
     @Test
-    void processWorkload_delete_missingMonth_savesWithoutChange() {
+    void processWorkload_delete_missingMonth_doesNotSave() {
         when(repository.findByTrainerUsername("Bruce.Wayne"))
                 .thenReturn(Optional.of(existingDoc(2024, 1, 60)));
 
         service.processWorkload(request(ActionType.DELETE, LocalDate.of(2024, 5, 1), 30));
 
+        verify(repository, never()).save(any());
+    }
+
+    // ---------- DELETE: non-existing year -> no-op, NO save ----------
+
+    @Test
+    void processWorkload_delete_missingYear_doesNotSave() {
+        when(repository.findByTrainerUsername("Bruce.Wayne"))
+                .thenReturn(Optional.of(existingDoc(2024, 1, 60)));
+
+        service.processWorkload(request(ActionType.DELETE, LocalDate.of(2030, 1, 1), 30));
+
+        verify(repository, never()).save(any());
+    }
+
+    // ---------- DELETE: new trainer -> still saves (isNew) ----------
+
+    @Test
+    void processWorkload_delete_newTrainer_savesEmptyDocument() {
+        when(repository.findByTrainerUsername("Bruce.Wayne")).thenReturn(Optional.empty());
+
+        service.processWorkload(request(ActionType.DELETE, LocalDate.of(2024, 1, 20), 30));
+
         TrainerWorkloadDocument saved = captureSaved();
-        assertThat(saved.getYears().get(0).getMonths().get(0).getSummaryDuration())
-                .isEqualTo(60); // unchanged
+        assertThat(saved.getTrainerUsername()).isEqualTo("Bruce.Wayne");
+        assertThat(saved.getYears()).isEmpty(); // DELETE on new trainer creates empty doc
     }
 
     // ---------- getSummary ----------
