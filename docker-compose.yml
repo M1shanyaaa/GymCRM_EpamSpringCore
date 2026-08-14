@@ -21,5 +21,19 @@ services:
       ACTIVEMQ_CONNECTION_USER: admin
       ACTIVEMQ_CONNECTION_PASSWORD: admin
 
+  # ===== NEW: MongoDB for workload aggregation =====
+  mongodb:
+    image: mongo:7
+    container_name: gym-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-mongo_user}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-mongo_pass}
+      MONGO_INITDB_DATABASE: gym_workload
+    volumes:
+      - gym_mongodata:/data/db
+
 volumes:
   gym_pgdata:
+  gym_mongodata:
