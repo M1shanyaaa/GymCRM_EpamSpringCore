@@ -1,19 +1,20 @@
 package com.epam.gym.service;
 
-import com.epam.gym.client.WorkloadClient;
 import com.epam.gym.dao.TraineeDao;
 import com.epam.gym.dao.TrainerDao;
 import com.epam.gym.dao.TrainingDao;
 import com.epam.gym.dao.TrainingTypeDao;
+import com.epam.gym.dto.client.ActionType;
+import com.epam.gym.dto.client.WorkloadRequest;
 import com.epam.gym.dto.response.TrainerShortResponse;
 import com.epam.gym.dto.response.TrainingResponse;
 import com.epam.gym.dto.response.TrainingTypeResponse;
 import com.epam.gym.exception.custom.EntityNotFoundException;
 import com.epam.gym.mapper.TrainerMapper;
 import com.epam.gym.mapper.TrainingMapper;
+import com.epam.gym.messaging.WorkloadMessageProducer;
 import com.epam.gym.model.*;
 
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
@@ -44,7 +45,7 @@ class TrainingServiceTest {
     @Mock private TrainingTypeDao trainingTypeDao;
     @Mock private TrainingMapper trainingMapper;
     @Mock private TrainerMapper trainerMapper;
-    @Mock private WorkloadClient workloadClient;
+    @Mock private WorkloadMessageProducer workloadMessageProducer;
 
     private MeterRegistry meterRegistry;
     private TrainingService trainingService;
@@ -57,11 +58,9 @@ class TrainingServiceTest {
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
 
-        // Реальний registry (робочий, не мок) — щоб circuitBreaker(...) повертав живий об'єкт
         trainingService = new TrainingService(
                 trainingDao, traineeDao, trainerDao, trainingTypeDao,
-                trainingMapper, trainerMapper, workloadClient,
-                CircuitBreakerRegistry.ofDefaults(),
+                trainingMapper, trainerMapper, workloadMessageProducer,
                 meterRegistry);
 
         strengthType = new TrainingType(TrainingTypeName.STRENGTH);
@@ -106,26 +105,32 @@ class TrainingServiceTest {
         assertThat(trainee.getTrainers()).contains(trainer);
         verify(traineeDao).update(trainee);
 
-        // workload-клієнт має бути викликаний
-        verify(workloadClient).updateWorkload(any());
+        // workload message must be sent asynchronously
+        verify(workloadMessageProducer).sendWorkload(any(WorkloadRequest.class));
     }
 
     @Test
-    void addTraining_whenWorkloadClientFails_fallbackPreventsException() {
+    void addTraining_shouldSendWorkloadMessageWithCorrectData() {
         when(traineeDao.findByUsername("John.Smith")).thenReturn(Optional.of(trainee));
         when(trainerDao.findByUsername("Bruce.Wayne")).thenReturn(Optional.of(trainer));
         when(trainingDao.save(any(Training.class))).thenAnswer(inv -> inv.getArgument(0));
-        // симулюємо падіння downstream-сервісу
-        doThrow(new RuntimeException("workload down"))
-                .when(workloadClient).updateWorkload(any());
 
-        // fallback (catch) не дає прокинути виняток — тренування все одно збережене
+        LocalDate date = LocalDate.of(2024, 1, 10);
         trainingService.addTraining(
                 "John.Smith", "Bruce.Wayne",
-                "Strength Session", LocalDate.now(), 45);
+                "Strength Session", date, 45);
 
-        verify(trainingDao).save(any(Training.class));
-        verify(workloadClient).updateWorkload(any());
+        ArgumentCaptor<WorkloadRequest> captor = ArgumentCaptor.forClass(WorkloadRequest.class);
+        verify(workloadMessageProducer).sendWorkload(captor.capture());
+
+        WorkloadRequest sent = captor.getValue();
+        assertThat(sent.getTrainerUsername()).isEqualTo("Bruce.Wayne");
+        assertThat(sent.getTrainerFirstName()).isEqualTo("Bruce");
+        assertThat(sent.getTrainerLastName()).isEqualTo("Wayne");
+        assertThat(sent.getActionType()).isEqualTo(ActionType.ADD);
+        assertThat(sent.getTrainingDate()).isEqualTo(date);
+        assertThat(sent.getTrainingDuration()).isEqualTo(45);
+        assertThat(sent.getIsActive()).isTrue();
     }
 
     @Test
@@ -137,6 +142,9 @@ class TrainingServiceTest {
                 "Session", LocalDate.now(), 30))
                 .isInstanceOf(EntityNotFoundException.class)
                 .hasMessageContaining("Trainee not found");
+
+        // no message should be sent if training was not created
+        verify(workloadMessageProducer, never()).sendWorkload(any());
     }
 
     @Test
@@ -149,6 +157,8 @@ class TrainingServiceTest {
                 "Session", LocalDate.now(), 30))
                 .isInstanceOf(EntityNotFoundException.class)
                 .hasMessageContaining("Trainer not found");
+
+        verify(workloadMessageProducer, never()).sendWorkload(any());
     }
 
     @Test
@@ -157,6 +167,8 @@ class TrainingServiceTest {
                 "John.Smith", "Bruce.Wayne",
                 " ", LocalDate.now(), 30))
                 .isInstanceOf(IllegalArgumentException.class);
+
+        verify(workloadMessageProducer, never()).sendWorkload(any());
     }
 
     // ---------- getTraineeTrainings ----------

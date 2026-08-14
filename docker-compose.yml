@@ -11,5 +11,15 @@ services:
       - gym_pgdata:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
 
+  activemq:
+    image: apache/activemq-classic:5.18.3
+    container_name: gym-activemq
+    ports:
+      - "61616:61616"   # JMS protocol
+      - "8161:8161"     # Web Console
+    environment:
+      ACTIVEMQ_CONNECTION_USER: admin
+      ACTIVEMQ_CONNECTION_PASSWORD: admin
+
 volumes:
   gym_pgdata:

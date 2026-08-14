@@ -3,6 +3,7 @@ package com.epam.gym.controller;
 import com.epam.gym.dto.response.JwtResponse;
 import com.epam.gym.exception.custom.AuthenticationException;
 import com.epam.gym.exception.custom.UserLockedException;
+import com.epam.gym.messaging.WorkloadMessageProducer;
 import com.epam.gym.security.JwtService;
 import com.epam.gym.security.TokenBlacklistService;
 import com.epam.gym.service.AuthService;
@@ -26,6 +27,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 class AuthControllerTest {
+
+    @MockBean
+    private WorkloadMessageProducer workloadMessageProducer;
 
     @Autowired
     private MockMvc mockMvc;

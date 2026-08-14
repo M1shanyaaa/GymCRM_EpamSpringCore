@@ -1,6 +1,5 @@
 package com.epam.gym.service;
 
-import com.epam.gym.client.WorkloadClient;
 import com.epam.gym.dao.TraineeDao;
 import com.epam.gym.dto.client.ActionType;
 import com.epam.gym.dto.client.WorkloadRequest;
@@ -8,6 +7,7 @@ import com.epam.gym.dto.response.CredentialsResponse;
 import com.epam.gym.dto.response.TraineeProfileResponse;
 import com.epam.gym.exception.custom.EntityNotFoundException;
 import com.epam.gym.mapper.TraineeMapper;
+import com.epam.gym.messaging.WorkloadMessageProducer;
 import com.epam.gym.model.Role;
 import com.epam.gym.model.Trainee;
 import com.epam.gym.model.Trainer;
@@ -18,8 +18,6 @@ import com.epam.gym.security.JwtService;
 import com.epam.gym.util.PasswordGenerator;
 import com.epam.gym.util.UsernameGenerator;
 
-import io.github.resilience4j.circuitbreaker.CircuitBreaker;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,6 +45,9 @@ import io.micrometer.core.instrument.MeterRegistry;
  * <p>
  * Password changes are handled exclusively by AuthService (see AuthController)
  * — do not duplicate that logic here.
+ * <p>
+ * Workload updates are sent asynchronously to the trainer-workload-service
+ * via ActiveMQ (see {@link WorkloadMessageProducer}).
  */
 @Service
 public class TraineeService {
@@ -59,8 +60,7 @@ public class TraineeService {
     private final PasswordEncoder passwordEncoder;
     private final TraineeMapper traineeMapper;
     private final JwtService jwtService;
-    private final WorkloadClient workloadClient;
-    private final CircuitBreakerRegistry circuitBreakerRegistry;
+    private final WorkloadMessageProducer workloadMessageProducer;
     private final Counter registrationCounter;
 
     @Autowired
@@ -70,8 +70,7 @@ public class TraineeService {
                           PasswordEncoder passwordEncoder,
                           TraineeMapper traineeMapper,
                           JwtService jwtService,
-                          WorkloadClient workloadClient,
-                          CircuitBreakerRegistry circuitBreakerRegistry,
+                          WorkloadMessageProducer workloadMessageProducer,
                           MeterRegistry meterRegistry) {
         this.traineeDao = traineeDao;
         this.usernameGenerator = usernameGenerator;
@@ -79,8 +78,7 @@ public class TraineeService {
         this.passwordEncoder = passwordEncoder;
         this.traineeMapper = traineeMapper;
         this.jwtService = jwtService;
-        this.workloadClient = workloadClient;
-        this.circuitBreakerRegistry = circuitBreakerRegistry;
+        this.workloadMessageProducer = workloadMessageProducer;
         this.registrationCounter = Counter.builder("gym.trainee.registrations.total")
                 .description("Total number of registered trainees")
                 .register(meterRegistry);
@@ -169,9 +167,7 @@ public class TraineeService {
         traineeDao.delete(trainee);
         log.info("Deleted trainee profile '{}' (cascade: user + trainings)", username);
 
-        CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker("workloadService");
-
-        // Send DELETE events to the workload microservice for each associated training
+        // Send DELETE events to the workload microservice ASYNCHRONOUSLY via ActiveMQ
         for (Training training : traineeTrainings) {
             Trainer trainer = training.getTrainer();
             WorkloadRequest workloadRequest = WorkloadRequest.builder()
@@ -184,17 +180,11 @@ public class TraineeService {
                     .actionType(ActionType.DELETE)
                     .build();
 
-            // FIX
-            try {
-                circuitBreaker.executeRunnable(() -> workloadClient.updateWorkload(workloadRequest));
-                log.debug("Sent workload DELETE request for trainer '{}'", trainer.getUser().getUsername());
-            } catch (Exception ex) {
-                log.warn("FALLBACK EXECUTED: Could not update workload for trainer '{}'. Reason: {}. Trainee is deleted in monolith, but workload sync failed.",
-                        trainer.getUser().getUsername(), ex.getMessage());
-            }
+            workloadMessageProducer.sendWorkload(workloadRequest);
         }
 
-        log.debug("Sent {} workload DELETE requests for trainee '{}'", traineeTrainings.size(), username);
+        log.debug("Queued {} workload DELETE messages for trainee '{}'",
+                traineeTrainings.size(), username);
     }
 
     // ---------- helpers ----------
