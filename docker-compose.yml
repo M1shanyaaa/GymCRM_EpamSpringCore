@@ -28,8 +28,8 @@ services:
     ports:
       - "27017:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-mongo_user}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-mongo_pass}
+      MONGO_INITDB_ROOT_USERNAME: mongo_user
+      MONGO_INITDB_ROOT_PASSWORD: mongo_pass
       MONGO_INITDB_DATABASE: gym_workload
     volumes:
       - gym_mongodata:/data/db
