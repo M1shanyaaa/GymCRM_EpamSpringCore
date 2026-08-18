@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.jms.DefaultJmsListenerContainerFactoryConfigurer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.jms.annotation.EnableJms;
 import org.springframework.jms.config.DefaultJmsListenerContainerFactory;
 import org.springframework.jms.core.JmsTemplate;
@@ -20,6 +21,7 @@ import jakarta.jms.ConnectionFactory;
 
 @Configuration
 @EnableJms
+@Profile("!test")
 public class ActiveMqConfig {
 
     @Value("${spring.activemq.broker-url}")
