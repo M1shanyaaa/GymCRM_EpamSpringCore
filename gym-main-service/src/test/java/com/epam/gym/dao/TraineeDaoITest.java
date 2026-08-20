@@ -30,7 +30,7 @@ class TraineeDaoITest {
                 .lastName("Smith")
                 .username(username)
                 .password("hashed")
-                .role(Role.TRAINEE) // ДОДАНО РОЛЬ
+                .role(Role.TRAINEE)
                 .isActive(true)
                 .build();
         return Trainee.builder()

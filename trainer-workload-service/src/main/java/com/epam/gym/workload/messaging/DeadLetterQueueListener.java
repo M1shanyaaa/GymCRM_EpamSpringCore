@@ -11,7 +11,7 @@ import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile("!test")
+@Profile("!test & !integration")
 public class DeadLetterQueueListener {
 
     private static final Logger log = LoggerFactory.getLogger(DeadLetterQueueListener.class);
