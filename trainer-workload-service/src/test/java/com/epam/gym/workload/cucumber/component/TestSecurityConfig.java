@@ -1,4 +1,4 @@
-package com.epam.gym.workload.cucumber;
+package com.epam.gym.workload.cucumber.component;
 
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;

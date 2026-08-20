@@ -1,4 +1,4 @@
-package com.epam.gym.workload.cucumber;
+package com.epam.gym.workload.cucumber.component;
 
 import com.epam.gym.workload.dto.ActionType;
 import com.epam.gym.workload.dto.WorkloadRequest;

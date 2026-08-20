@@ -1,4 +1,4 @@
-package com.epam.gym.workload.integration;
+package com.epam.gym.workload.cucumber.integration;
 
 import com.epam.gym.workload.repo.TrainerWorkloadRepository;
 import io.jsonwebtoken.Jwts;
@@ -29,6 +29,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "security.jwt.secret=dGVzdC1zZWNyZXQtdGVzdC1zZWNyZXQtdGVzdC1zZWNyZXQtMTIzNA==",
         "security.jwt.expiration=3600000",
         "eureka.client.enabled=false",
+        "logging.level.org.testcontainers=DEBUG", // Вмикаємо логи Testcontainers
+        "logging.level.com.github.dockerjava=DEBUG" // Вмикаємо логи Docker-клієнта
 })
 class WorkloadIntegrationTest {
 

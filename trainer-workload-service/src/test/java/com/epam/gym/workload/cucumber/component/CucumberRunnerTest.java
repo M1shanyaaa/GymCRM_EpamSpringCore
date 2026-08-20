@@ -1,4 +1,4 @@
-package com.epam.gym.workload.cucumber;
+package com.epam.gym.workload.cucumber.component;
 
 import org.junit.platform.suite.api.ConfigurationParameter;
 import org.junit.platform.suite.api.IncludeEngines;
@@ -10,8 +10,8 @@ import static io.cucumber.junit.platform.engine.Constants.PLUGIN_PROPERTY_NAME;
 
 @Suite
 @IncludeEngines("cucumber")
-@SelectClasspathResource("features")
-@ConfigurationParameter(key = GLUE_PROPERTY_NAME, value = "com.epam.gym.workload.cucumber")
+@SelectClasspathResource("features/component")
+@ConfigurationParameter(key = GLUE_PROPERTY_NAME, value = "com.epam.gym.workload.cucumber.component")
 @ConfigurationParameter(key = PLUGIN_PROPERTY_NAME, value = "pretty, html:target/cucumber-report.html")
 public class CucumberRunnerTest {
 }
