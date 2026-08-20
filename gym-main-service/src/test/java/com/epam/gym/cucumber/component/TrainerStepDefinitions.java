@@ -19,6 +19,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDate;
 import java.util.HashMap;
@@ -32,11 +33,14 @@ public class TrainerStepDefinitions {
 
     private final TestRestTemplate restTemplate;
     private final WorkloadMessageProducer workloadMessageProducer;
+    private final JdbcTemplate jdbcTemplate;
 
     public TrainerStepDefinitions(TestRestTemplate restTemplate,
-                                  WorkloadMessageProducer workloadMessageProducer) {
+                                  WorkloadMessageProducer workloadMessageProducer,
+                                  JdbcTemplate jdbcTemplate) {
         this.restTemplate = restTemplate;
         this.workloadMessageProducer = workloadMessageProducer;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     private ResponseEntity<?> lastResponse;
@@ -45,7 +49,17 @@ public class TrainerStepDefinitions {
     private CredentialsResponse lastRegisteredCredentials;
     private String jwtToken;
 
-    @Before
+    @Before(order = 0)
+    public void seedTrainingTypes() {
+        for (TrainingTypeName type : TrainingTypeName.values()) {
+            jdbcTemplate.update(
+                    "MERGE INTO training_types (training_type_name) KEY(training_type_name) VALUES (?)",
+                    type.name()
+            );
+        }
+    }
+
+    @Before(order = 1)
     public void reset() {
         Mockito.reset(workloadMessageProducer);
         lastResponse = null;
