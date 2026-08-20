@@ -1,0 +1,16 @@
+<!--<configuration>-->
+<!--    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">-->
+<!--        <encoder>-->
+<!--            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>-->
+<!--        </encoder>-->
+<!--    </appender>-->
+
+<!--    &lt;!&ndash; ДЕТАЛЬНІ логи Testcontainers і docker-java &ndash;&gt;-->
+<!--    <logger name="org.testcontainers" level="DEBUG"/>-->
+<!--    <logger name="com.github.dockerjava" level="DEBUG"/>-->
+<!--    <logger name="tc.docker" level="DEBUG"/>-->
+
+<!--    <root level="INFO">-->
+<!--        <appender-ref ref="STDOUT"/>-->
+<!--    </root>-->
+<!--</configuration>-->
