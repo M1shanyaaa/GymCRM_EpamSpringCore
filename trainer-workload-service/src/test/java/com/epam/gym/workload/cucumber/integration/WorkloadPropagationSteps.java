@@ -2,7 +2,6 @@ package com.epam.gym.workload.cucumber.integration;
 
 import com.epam.gym.workload.document.MonthSummary;
 import com.epam.gym.workload.document.TrainerWorkloadDocument;
-import com.epam.gym.workload.document.YearSummary;
 import com.epam.gym.workload.dto.ActionType;
 import com.epam.gym.workload.dto.WorkloadRequest;
 import com.epam.gym.workload.repo.TrainerWorkloadRepository;
@@ -33,6 +32,9 @@ public class WorkloadPropagationSteps {
     @Value("${gym.messaging.workload-queue}")
     private String workloadQueue;
 
+    @Value("${gym.messaging.workload-dlq}")
+    private String deadLetterQueue;
+
     @Value("${security.jwt.secret}")
     private String jwtSecret;
 
@@ -43,8 +45,10 @@ public class WorkloadPropagationSteps {
     }
 
     @Before
-    public void cleanDb() {
+    public void cleanUp() {
         repository.deleteAll();
+        drainQueue(deadLetterQueue);
+        drainQueue(workloadQueue);
     }
 
     // ---------- Send valid event ----------
@@ -71,7 +75,6 @@ public class WorkloadPropagationSteps {
                 null, "No", "Name", true,
                 LocalDate.parse("2024-03-10"), 60, ActionType.ADD);
 
-        // token subject can be anything valid; validator fails before auth anyway
         String token = generateToken("someone");
 
         jmsTemplate.convertAndSend(workloadQueue, request, message -> {
@@ -81,7 +84,7 @@ public class WorkloadPropagationSteps {
         });
     }
 
-    // ---------- Assert summary ----------
+    // ---------- Assert summary present ----------
     @Then("the workload summary for trainer {string} eventually has {int} minutes for year {int} month {int}")
     public void summaryHasMinutes(String username, int minutes, int year, int month) {
         await().atMost(Duration.ofSeconds(15))
@@ -96,9 +99,22 @@ public class WorkloadPropagationSteps {
                 });
     }
 
+    // ---------- Assert message routed to DLQ (NEW, stronger check) ----------
+    @Then("the invalid message eventually lands in the dead-letter queue")
+    public void invalidMessageInDlq() {
+        await().atMost(Duration.ofSeconds(10))
+                .pollInterval(Duration.ofMillis(500))
+                .untilAsserted(() -> {
+                    Object dlqMessage = jmsTemplate.receiveAndConvert(deadLetterQueue);
+                    assertThat(dlqMessage)
+                            .as("Expected an invalid message in the dead-letter queue")
+                            .isNotNull();
+                });
+    }
+
+    // ---------- Assert nothing persisted ----------
     @Then("no workload summary exists for trainer {string} after processing")
     public void noSummaryExists(String username) {
-        // Give the listener time to route to DLQ (and NOT persist)
         await().during(Duration.ofSeconds(3))
                 .atMost(Duration.ofSeconds(6))
                 .untilAsserted(() ->
@@ -113,6 +129,13 @@ public class WorkloadPropagationSteps {
                 .filter(m -> m.getMonth() == month)
                 .mapToLong(MonthSummary::getSummaryDuration)
                 .sum();
+    }
+
+    private void drainQueue(String queue) {
+        // Remove any leftover messages so scenarios don't interfere
+        jmsTemplate.setReceiveTimeout(200);
+        while (jmsTemplate.receive(queue) != null) {
+        }
     }
 
     private String generateToken(String subject) {

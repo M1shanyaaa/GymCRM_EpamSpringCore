@@ -11,4 +11,5 @@ Feature: Workload propagation via ActiveMQ into workload service Mongo store
 
   Scenario: Invalid workload event (missing trainer username) goes to DLQ (negative)
     When an invalid workload event with missing trainer username is sent
-    Then no workload summary exists for trainer "" after processing
+    Then the invalid message eventually lands in the dead-letter queue
+    And no workload summary exists for trainer "invalid.trainer" after processing
